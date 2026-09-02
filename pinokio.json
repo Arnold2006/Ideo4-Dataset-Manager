@@ -1,0 +1,14 @@
+{
+  "version": "7.0",
+  "title": "Ideogram 4 Dataset Editor",
+  "description": "Edit Ideogram 4 fine-tuning datasets with AI image captioning (single image or whole batch) powered by a local llama.cpp vision model.",
+  "icon": "icon.png",
+  "links": [
+    {
+      "title": "Dataset editor",
+      "links": [
+        { "type": "github", "value": "https://github.com/Ideogram-4" }
+      ]
+    }
+  ]
+}

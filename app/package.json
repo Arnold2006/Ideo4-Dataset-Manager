@@ -1,0 +1,11 @@
+{
+  "name": "ideo4-caption-server",
+  "version": "1.0.0",
+  "description": "Local AI captioning server for the Ideogram 4 dataset editor (llama.cpp vision)",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,15 @@
+# Node
+node_modules/
+app/node_modules/
+
+# Downloaded model weights (large, re-downloaded by install.js)
+app/models/
+
+# Generated at runtime
+server-info.json
+app/server-info.json
+
+# Logs
+logs/
+*.log
+.DS_Store

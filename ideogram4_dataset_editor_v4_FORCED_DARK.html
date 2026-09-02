@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ideogram 4 Dataset Editor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);font-size:14px;color:var(--color-text-primary)}
+#app{display:flex;flex-direction:column;height:100vh;min-height:640px}
+
+#toolbar{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0;background:var(--color-background-primary)}
+#toolbar-title{font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px;margin-right:auto}
+#progress-wrap{width:100px;height:3px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden}
+#progress-bar{height:100%;background:#1D9E75;transition:width 0.3s;width:0%}
+#counter{font-size:13px;color:var(--color-text-secondary);min-width:60px;text-align:center}
+.tbar-btn{background:none;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:6px 11px;cursor:pointer;font-size:13px;color:var(--color-text-primary);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.tbar-btn:hover{background:var(--color-background-secondary)}
+.tbar-btn:disabled{opacity:0.35;cursor:not-allowed}
+.tbar-btn.primary{border-color:#1D9E75;color:#0F6E56}
+.tbar-btn.primary:hover{background:#E1F5EE}
+#save-indicator{font-size:12px;color:#1D9E75;opacity:0;transition:opacity 0.4s;white-space:nowrap}
+#save-indicator.show{opacity:1}
+#unsaved-dot{width:7px;height:7px;border-radius:50%;background:#BA7517;display:none;flex-shrink:0}
+.tsep{width:1px;height:22px;background:var(--color-border-secondary);flex-shrink:0;margin:0 2px}
+.ai-btn{border-color:#7C3AED;color:#8b5cf6}
+.ai-btn:hover{background:rgba(124,58,237,0.12)}
+#ai-status{display:none;align-items:center;gap:8px;font-size:12px;color:var(--color-text-secondary);white-space:nowrap}
+#ai-status .spin{width:13px;height:13px;border:2px solid var(--color-border-secondary);border-top-color:#8b5cf6;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#ai-status .ok{color:#1D9E75}
+#ai-status .err{color:var(--color-text-danger)}
+#server-bar{display:none;align-items:center;gap:8px;padding:5px 12px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);font-size:12px;flex-shrink:0}
+#server-bar .lbl{color:var(--color-text-secondary);display:flex;align-items:center;gap:6px}
+#server-bar .dot{width:8px;height:8px;border-radius:50%;background:#BA7517}
+#server-bar .dot.on{background:#1D9E75}
+#server-bar input[type=text]{width:280px;font-size:12px;padding:5px 8px}
+#server-bar .tbar-btn{font-size:12px;padding:4px 9px}
+
+#workspace{display:flex;flex:1;overflow:hidden}
+#sidebar{width:460px;border-right:0.5px solid var(--color-border-tertiary);overflow-y:auto;flex-shrink:0;display:none;background:var(--color-background-primary)}
+.si-grid{display:grid;grid-template-columns:repeat(2,200px);gap:12px;padding:12px;justify-content:center}
+.si{position:relative;width:200px;height:200px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden;cursor:pointer;user-select:none;background:var(--color-background-secondary)}
+.si:hover{border-color:var(--color-border-secondary)}
+.si.active{border-color:#1D9E75;box-shadow:0 0 0 2px rgba(29,158,117,0.35)}
+.si img{width:100%;height:100%;object-fit:cover;display:block}
+.si-cap{position:absolute;left:0;right:0;bottom:0;padding:4px 7px;font-size:11px;color:#fff;background:rgba(0,0,0,0.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.35);border:1px solid rgba(0,0,0,0.4);z-index:2}
+.si-dot.done{background:#1D9E75;border-color:#0F6E56}
+.si-dot.new{background:#BA7517;border-color:#8a5a12;border-style:dashed}
+.si-newtag{position:absolute;top:6px;left:6px;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;background:#BA7517;color:#1a1205;z-index:2;letter-spacing:0.02em}
+
+#main{display:flex;flex:1;overflow:hidden}
+
+#left-col{flex:1;border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;background:var(--color-background-tertiary);position:relative;min-width:0}
+#img-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+#img-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block;user-select:none}
+#bbox-canvas{position:absolute;top:0;left:0;pointer-events:auto;cursor:default}
+#img-name{padding:8px 10px;font-size:12px;color:var(--color-text-secondary);border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);word-break:break-all;line-height:1.4}
+
+#right-col{flex:1;overflow-y:auto;background:var(--color-background-primary)}
+
+#drop-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px;background:var(--color-background-primary)}
+#drop-zone i{font-size:36px;color:var(--color-text-secondary);margin-bottom:10px}
+#drop-zone h2{font-size:16px;font-weight:500;margin-bottom:6px}
+#drop-zone p{font-size:13px;color:var(--color-text-secondary);max-width:260px;line-height:1.6;margin-bottom:16px}
+
+.section{border-bottom:0.5px solid var(--color-border-tertiary)}
+.section-hdr{display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer;user-select:none;background:var(--color-background-primary)}
+.section-hdr:hover{background:var(--color-background-secondary)}
+.section-hdr-icon{font-size:16px;color:var(--color-text-secondary)}
+.section-hdr-label{font-size:13px;font-weight:500;flex:1}
+.section-hdr-caret{font-size:15px;color:var(--color-text-secondary);transition:transform 0.2s}
+.section-hdr-caret.open{transform:rotate(180deg)}
+.section-body{padding:0 14px 14px;display:none}
+.section-body.open{display:block}
+
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em}
+.field-hint{font-size:12px;color:var(--color-text-tertiary);margin-top:4px;line-height:1.4}
+textarea,input[type=text]{width:100%;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:9px 10px;font-family:var(--font-sans);font-size:15px;background:var(--color-background-primary);color:var(--color-text-primary);resize:vertical;line-height:1.55}
+textarea:focus,input[type=text]:focus{outline:none;border-color:var(--color-border-primary)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.palette-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}
+.chip{display:flex;align-items:center;gap:5px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:20px;padding:4px 9px 4px 6px;font-size:12px}
+.chip-sw{width:13px;height:13px;border-radius:50%;border:0.5px solid var(--color-border-tertiary);flex-shrink:0}
+.chip-del{background:none;border:none;cursor:pointer;color:var(--color-text-secondary);font-size:13px;line-height:1;padding:0;margin-left:2px}
+.chip-del:hover{color:var(--color-text-danger)}
+.add-color-row{display:flex;gap:6px;align-items:center;margin-top:6px}
+.add-color-row input[type=color]{width:28px;height:28px;padding:1px;border:0.5px solid var(--color-border-tertiary);border-radius:4px;cursor:pointer;background:none}
+.add-color-row .tbar-btn{font-size:12px;padding:5px 9px}
+
+.el-card{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:10px;overflow:hidden}
+.el-card-hdr{display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--color-background-secondary);cursor:pointer;user-select:none}
+.el-card-hdr:hover{background:var(--color-background-tertiary)}
+.el-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;letter-spacing:0.03em}
+.badge-obj{background:#E1F5EE;color:#085041}
+.badge-txt{background:#E6F1FB;color:#0C447C}
+.el-card-title{font-size:13px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-text-secondary)}
+.el-card-body{padding:11px;display:none}
+.el-card-body.open{display:block}
+.el-del{background:none;border:none;cursor:pointer;color:var(--color-text-secondary);padding:3px 5px;border-radius:4px;font-size:15px;line-height:1}
+.el-del:hover{background:var(--color-background-danger);color:var(--color-text-danger)}
+.el-highlight{border-color:#378ADD}
+.el-highlight .el-card-hdr{background:#E6F1FB}
+
+.bbox-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:4px}
+.bbox-cell label{font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:3px;text-align:center}
+.bbox-cell input{text-align:center;font-size:13px;padding:7px 6px}
+
+.add-el-row{display:flex;gap:8px;margin-top:4px}
+.add-el-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:0.5px dashed var(--color-border-secondary);background:none;border-radius:var(--border-radius-md);padding:8px;cursor:pointer;font-size:13px;color:var(--color-text-secondary)}
+.add-el-btn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+
+.photo-art-toggle{display:flex;gap:0;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden;margin-bottom:8px}
+.pat-btn{flex:1;padding:6px 8px;font-size:12px;background:none;border:none;cursor:pointer;color:var(--color-text-secondary)}
+.pat-btn.active{background:var(--color-background-secondary);color:var(--color-text-primary);font-weight:500}
+.pat-btn:first-child{border-right:0.5px solid var(--color-border-tertiary)}
+
+#el-sections{padding:14px}
+</style>
+
+<style id="forced-dark-theme">
+:root{
+  color-scheme: dark !important;
+  --color-background-primary:#181818 !important;
+  --color-background-secondary:#242424 !important;
+  --color-background-tertiary:#101010 !important;
+  --color-background-danger:#3a1f1f !important;
+
+  --color-text-primary:#f0f0f0 !important;
+  --color-text-secondary:#c8c8c8 !important;
+  --color-text-tertiary:#9e9e9e !important;
+  --color-text-danger:#ff8a8a !important;
+
+  --color-border-primary:#5aa7ff !important;
+  --color-border-secondary:#4a4a4a !important;
+  --color-border-tertiary:#3a3a3a !important;
+
+  --border-radius-md:12px;
+  --border-radius-lg:14px;
+}
+
+html,body,#app{
+  background:#181818 !important;
+  color:#f0f0f0 !important;
+}
+
+.section{
+  margin:14px;
+  border:1px solid #3a3a3a !important;
+  border-radius:14px;
+}
+
+.section-hdr-label{font-size:18px !important;font-weight:700 !important;}
+.field label{font-size:14px !important;}
+textarea,input[type=text]{
+  font-size:18px !important;
+  padding:16px !important;
+  border:2px solid #505050 !important;
+  background:#242424 !important;
+}
+textarea:focus,input[type=text]:focus{
+  box-shadow:0 0 0 3px rgba(90,167,255,.25);
+}
+</style>
+
+
+<div id="app">
+  <div id="toolbar">
+    <div id="toolbar-title"><i class="ti ti-layers-subtract" aria-hidden="true" style="font-size:17px"></i> Ideogram 4 dataset editor</div>
+    <span id="unsaved-dot"></span>
+    <span id="save-indicator"><i class="ti ti-check"></i> Saved</span>
+    <div id="progress-wrap" style="display:none"><div id="progress-bar"></div></div>
+    <span id="counter" style="display:none"></span>
+    <span id="ai-status"><span class="spin" id="ai-spin"></span><span id="ai-status-text"></span></span>
+    <span id="nav-btns" style="display:none;gap:4px;align-items:center">
+      <button class="tbar-btn" id="btn-prev" onclick="navigate(-1)" disabled><i class="ti ti-chevron-left"></i></button>
+      <button class="tbar-btn" id="btn-next" onclick="navigate(1)" disabled><i class="ti ti-chevron-right"></i></button>
+      <button class="tbar-btn primary" onclick="saveCurrentJson()"><i class="ti ti-device-floppy"></i> Save</button>
+      <button class="tbar-btn" onclick="saveAll()"><i class="ti ti-file-zip"></i> Save all</button>
+      <span class="tsep"></span>
+      <button class="tbar-btn ai-btn" id="btn-ai-cur" onclick="captionCurrent()" disabled><i class="ti ti-sparkles"></i> AI caption</button>
+      <button class="tbar-btn ai-btn" id="btn-ai-all" onclick="captionAll()" disabled><i class="ti ti-sparkles"></i> Caption all</button>
+    </span>
+  </div>
+
+  <div id="server-bar">
+    <span class="lbl"><span class="dot" id="server-dot"></span> Caption server</span>
+    <input type="text" id="server-url" placeholder="http://127.0.0.1:PORT  (auto-detected when running under Pinokio)">
+    <button class="tbar-btn" onclick="setServerUrl()"><i class="ti ti-link"></i> Set</button>
+    <button class="tbar-btn" onclick="detectServerUrl()"><i class="ti ti-scan"></i> Auto-detect</button>
+    <span id="server-state" style="color:var(--color-text-tertiary)">not connected</span>
+  </div>
+
+  <div id="workspace">
+    <div id="sidebar"></div>
+    <div id="main">
+      <div id="left-col">
+        <div id="img-wrap">
+          <div id="drop-zone">
+            <i class="ti ti-folder-open" aria-hidden="true"></i>
+            <h2>Open your dataset folder</h2>
+            <p>Select a folder with image files. Paired .json caption files are loaded if present; images without one get a new JSON on save.</p>
+            <button class="tbar-btn" onclick="openFolder()" style="margin:0 auto"><i class="ti ti-folder"></i> Choose folder</button>
+          </div>
+          <canvas id="bbox-canvas"></canvas>
+        </div>
+        <div id="img-name" style="display:none"></div>
+      </div>
+
+      <div id="right-col" style="display:none">
+
+        <div class="section" id="sec-overview">
+          <div class="section-hdr" onclick="toggleSection('overview')">
+            <i class="ti ti-align-left section-hdr-icon" aria-hidden="true"></i>
+            <span class="section-hdr-label">Overview</span>
+            <i class="ti ti-chevron-down section-hdr-caret open" id="caret-overview"></i>
+          </div>
+          <div class="section-body open" id="body-overview">
+            <div class="field">
+              <label>High-level description</label>
+              <textarea id="f-hld" rows="3" oninput="onFormChange()" placeholder="A one or two-sentence summary of the full image…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" id="sec-style">
+          <div class="section-hdr" onclick="toggleSection('style')">
+            <i class="ti ti-palette section-hdr-icon" aria-hidden="true"></i>
+            <span class="section-hdr-label">Style</span>
+            <i class="ti ti-chevron-down section-hdr-caret" id="caret-style"></i>
+          </div>
+          <div class="section-body" id="body-style">
+            <div class="field">
+              <label>Aesthetics</label>
+              <textarea id="f-aesthetics" rows="2" oninput="onFormChange()" placeholder="warm, cozy, soft bokeh…"></textarea>
+            </div>
+            <div class="field">
+              <label>Lighting</label>
+              <textarea id="f-lighting" rows="2" oninput="onFormChange()" placeholder="warm indoor light, backlit steam…"></textarea>
+            </div>
+            <div class="field">
+              <label>Medium</label>
+              <input type="text" id="f-medium" oninput="onFormChange()" placeholder="photograph, oil painting, digital illustration…">
+            </div>
+            <div class="field">
+              <label>Photo / art style</label>
+              <div class="photo-art-toggle">
+                <button class="pat-btn active" id="pat-photo" onclick="setPhotoArt('photo')"><i class="ti ti-camera"></i> Photo</button>
+                <button class="pat-btn" id="pat-art" onclick="setPhotoArt('art')"><i class="ti ti-brush"></i> Art style</button>
+              </div>
+              <input type="text" id="f-photoart" oninput="onFormChange()" placeholder="35mm, f/1.8 — or — impressionist, loose brushwork…">
+              <div class="field-hint">Use "photo" for photographic images, "art style" for everything else — not both.</div>
+            </div>
+            <div class="field">
+              <label>Global color palette</label>
+              <div class="palette-row" id="global-chips"></div>
+              <div class="add-color-row">
+                <input type="color" id="global-picker" value="#888888">
+                <button class="tbar-btn" onclick="addColor('global')"><i class="ti ti-plus"></i> Add color</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" id="sec-comp">
+          <div class="section-hdr" onclick="toggleSection('comp')">
+            <i class="ti ti-layout section-hdr-icon" aria-hidden="true"></i>
+            <span class="section-hdr-label">Composition</span>
+            <i class="ti ti-chevron-down section-hdr-caret" id="caret-comp"></i>
+          </div>
+          <div class="section-body" id="body-comp">
+            <div class="field">
+              <label>Background</label>
+              <textarea id="f-bg" rows="2" oninput="onFormChange()" placeholder="Describe the scene background…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-hdr" onclick="toggleSection('elements')">
+            <i class="ti ti-stack section-hdr-icon" aria-hidden="true"></i>
+            <span class="section-hdr-label">Elements</span>
+            <span id="el-count-badge" style="font-size:12px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:1px 8px;color:var(--color-text-secondary)">0</span>
+            <i class="ti ti-chevron-down section-hdr-caret" id="caret-elements"></i>
+          </div>
+          <div class="section-body" id="body-elements">
+            <div id="el-sections"></div>
+            <div class="add-el-row">
+              <button class="add-el-btn" onclick="addElement('obj')"><i class="ti ti-circle-plus"></i> Add object</button>
+              <button class="add-el-btn" onclick="addElement('text')"><i class="ti ti-text-size"></i> Add text</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let dataset=[], current=0, dirHandle=null, modified=new Set(), photoArtMode={};
+let selectedIdx=null, dragState=null, hitAreas={handles:{},delBtn:null,boxes:[]};
+let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false;
+
+async function openFolder(){
+  try{
+    dirHandle=await window.showDirectoryPicker({mode:'readwrite'});
+    await loadDataset();
+  }catch(e){if(e.name!=='AbortError')alert('Could not open folder: '+e.message)}
+}
+
+async function loadDataset(){
+  dataset=[];
+  const entries={};
+  for await(const [name,handle] of dirHandle.entries()){
+    const ext=name.split('.').pop().toLowerCase();
+    const base=name.slice(0,name.lastIndexOf('.'));
+    if(!entries[base])entries[base]={};
+    if(['jpg','jpeg','png','webp','gif','bmp'].includes(ext))entries[base].img={name,handle};
+    if(ext==='json')entries[base].json={name,handle};
+  }
+  for(const [base,pair] of Object.entries(entries)){
+    if(pair.img){
+      let data={},jsonHandle=null,jsonName=null;
+      if(pair.json){
+        const jf=await pair.json.handle.getFile();
+        try{data=JSON.parse(await jf.text())}catch(e){}
+        jsonHandle=pair.json.handle; jsonName=pair.json.name;
+      }
+      const imgFile=await pair.img.handle.getFile();
+      const imgUrl=URL.createObjectURL(imgFile);
+      dataset.push({base,imgName:pair.img.name,jsonName,jsonHandle,imgUrl,data});
+    }
+  }
+  dataset.sort((a,b)=>a.base.localeCompare(b.base));
+  if(!dataset.length){alert('No image files found.');return}
+  modified=new Set(); current=0;
+  buildSidebar(); showEditor(); renderEntry();
+}
+
+function buildSidebar(){
+  const sb=document.getElementById('sidebar');
+  sb.style.display='block';
+  sb.innerHTML='<div class="si-grid">'+dataset.map((d,i)=>`<div class="si${i===current?' active':''}" onclick="goTo(${i})" id="si-${i}"><img src="${d.imgUrl}" alt="${esc(d.base)}" loading="lazy">${d.jsonHandle?'':'<span class="si-newtag">new</span>'}<div class="si-cap" title="${esc(d.imgName)}">${esc(d.base)}</div><span class="si-dot" id="sd-${i}"></span></div>`).join('')+'</div>';
+}
+
+function updateSidebar(){
+  dataset.forEach((d,i)=>{
+    const hasJson=!!d.jsonHandle;
+    const dot=document.getElementById('sd-'+i);
+    if(dot)dot.className='si-dot'+(!hasJson?' new':(modified.has(i)?' done':''));
+    const s=document.getElementById('si-'+i);if(s)s.className='si'+(i===current?' active':'');
+  });
+}
+
+function showEditor(){
+  document.getElementById('drop-zone').style.display='none';
+  document.getElementById('right-col').style.display='block';
+  document.getElementById('img-name').style.display='block';
+  const nb=document.getElementById('nav-btns');
+  nb.style.display='flex';
+  document.getElementById('counter').style.display='inline';
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('server-bar').style.display='flex';
+  if(serverUrl)document.getElementById('server-url').value=serverUrl;
+  updateAiButtons();
+  detectServerUrl(true);
+}
+
+function updateAiButtons(){
+  const b=document.getElementById('btn-ai-cur'), a=document.getElementById('btn-ai-all');
+  if(b)b.disabled=aiBusy||!serverUrl;
+  if(a)a.disabled=aiBusy||!serverUrl;
+}
+
+function setServerUrl(){
+  const v=document.getElementById('server-url').value.trim().replace(/\/+$/,'');
+  if(!v){serverUrl='';localStorage.removeItem('ideo4_server_url');updateAiButtons();markServer(false,'cleared');return}
+  serverUrl=v;localStorage.setItem('ideo4_server_url',v);updateAiButtons();
+  checkServer();
+}
+
+async function detectServerUrl(silent){
+  const cands=[location.origin,'http://127.0.0.1:8123','http://localhost:8123'];
+  for(const c of cands){
+    try{
+      const r=await fetch(c+'/api/server-info',{signal:AbortSignal.timeout(1500)});
+      if(r.ok){const j=await r.json();const url=j.url||c;if(serverUrl!==url){serverUrl=url;localStorage.setItem('ideo4_server_url',url)}document.getElementById('server-url').value=url;updateAiButtons();markServer(true,url);return}
+    }catch(e){}
+  }
+  if(serverUrl){markServer(false,'unreachable');return}
+  if(!silent)markServer(false,'not found — enter the server URL');
+}
+
+function markServer(ok,msg){
+  const dot=document.getElementById('server-dot'), st=document.getElementById('server-state');
+  if(dot)dot.className='dot'+(ok?' on':'');
+  if(st){st.textContent=ok?('connected — '+msg):(msg||'not connected');st.style.color=ok?'#1D9E75':'var(--color-text-tertiary)';}
+}
+
+async function checkServer(){
+  try{const r=await fetch(serverUrl+'/health',{signal:AbortSignal.timeout(2000)});if(r.ok)markServer(true,serverUrl);else markServer(false,'unreachable')}
+  catch(e){markServer(false,'unreachable')}
+}
+
+function setAiStatus(kind,text){
+  const wrap=document.getElementById('ai-status'),spin=document.getElementById('ai-spin'),t=document.getElementById('ai-status-text');
+  wrap.style.display='flex';spin.style.display=kind==='busy'?'inline-block':'none';
+  t.textContent=text;t.className=kind==='busy'?'':(kind==='ok'?'ok':'err');
+}
+
+async function navigate(dir){
+  const n=current+dir;
+  if(n<0||n>=dataset.length)return;
+  if(modified.has(current))await saveCurrentJson();
+  current=n; renderEntry();
+}
+async function goTo(i){
+  if(modified.has(current))await saveCurrentJson();
+  current=i;renderEntry();
+}
+
+function renderEntry(){
+  const d=dataset[current];
+  const img=document.getElementById('img-wrap');
+  const existing=img.querySelector('img');
+  if(existing)img.removeChild(existing);
+  const im=document.createElement('img');
+  im.src=d.imgUrl; im.alt=d.imgName;
+  im.onload=()=>drawBboxes();
+  img.insertBefore(im,img.firstChild);
+  document.getElementById('img-name').textContent=d.imgName;
+  document.getElementById('counter').textContent=`${current+1} / ${dataset.length}`;
+  document.getElementById('btn-prev').disabled=current===0;
+  document.getElementById('btn-next').disabled=current===dataset.length-1;
+  document.getElementById('progress-bar').style.width=((current+1)/dataset.length*100).toFixed(1)+'%';
+  updateSidebar();
+  fillForm(d.data);
+}
+
+function fillForm(data){
+  const sd=data.style_description||{};
+  const cd=data.compositional_deconstruction||{};
+  document.getElementById('f-hld').value=data.high_level_description||'';
+  document.getElementById('f-aesthetics').value=sd.aesthetics||'';
+  document.getElementById('f-lighting').value=sd.lighting||'';
+  document.getElementById('f-medium').value=sd.medium||'';
+  const isPhoto=!!sd.photo;
+  photoArtMode[current]=isPhoto?'photo':'art';
+  setPhotoArtUI(isPhoto?'photo':'art');
+  document.getElementById('f-photoart').value=sd.photo||sd.art_style||'';
+  renderGlobalPalette(sd.color_palette||[]);
+  document.getElementById('f-bg').value=cd.background||'';
+  renderElements(cd.elements||[]);
+  document.getElementById('unsaved-dot').style.display='none';
+}
+
+function setPhotoArt(mode){
+  photoArtMode[current]=mode;
+  setPhotoArtUI(mode);
+  onFormChange();
+}
+function setPhotoArtUI(mode){
+  document.getElementById('pat-photo').className='pat-btn'+(mode==='photo'?' active':'');
+  document.getElementById('pat-art').className='pat-btn'+(mode==='art'?' active':'');
+}
+
+function renderGlobalPalette(colors){
+  const container=document.getElementById('global-chips');
+  container.innerHTML=colors.map((c,i)=>`<span class="chip"><span class="chip-sw" style="background:${c}"></span>${c}<button class="chip-del" onclick="removeColor('global',${i})" title="Remove">×</button></span>`).join('');
+}
+
+function renderElements(elements){
+  const container=document.getElementById('el-sections');
+  document.getElementById('el-count-badge').textContent=elements.length;
+  if(!elements.length){container.innerHTML='<div style="font-size:13px;color:var(--color-text-secondary);padding:0 0 10px;text-align:center">No elements yet</div>';return}
+  container.innerHTML=elements.map((el,i)=>elementHtml(el,i)).join('');
+}
+
+function elementHtml(el,i){
+  const b=el.bbox||[0,0,0,0];
+  const preview=el.desc?el.desc.slice(0,40)+(el.desc.length>40?'…':''):(el.type==='text'&&el.text?`"${el.text}"`:el.type==='obj'?'Object':'Text element');
+  const textRow=el.type==='text'?`<div class="field"><label>Exact text string</label><input type="text" class="el-text" value="${esc(el.text||'')}" oninput="onElChange(${i})" placeholder="The text as it appears in the image"></div>`:'';
+  const elPalette=(el.color_palette||[]).map((c,ci)=>`<span class="chip"><span class="chip-sw" style="background:${c}"></span>${c}<button class="chip-del" onclick="removeElColor(${i},${ci})" title="Remove">×</button></span>`).join('');
+  return`<div class="el-card" id="elcard-${i}" data-type="${el.type}">
+    <div class="el-card-hdr" onclick="toggleEl(${i})">
+      <span class="el-badge ${el.type==='obj'?'badge-obj':'badge-txt'}">${el.type==='obj'?'Object':'Text'}</span>
+      <span class="el-card-title">${esc(preview)}</span>
+      <button class="el-del" onclick="event.stopPropagation();removeElement(${i})" title="Delete element"><i class="ti ti-trash"></i></button>
+      <i class="ti ti-chevron-down" style="font-size:14px;color:var(--color-text-secondary)" id="elcaret-${i}"></i>
+    </div>
+    <div class="el-card-body" id="elbody-${i}">
+      <div class="field"><label>Description</label><textarea class="el-desc" rows="3" oninput="onElChange(${i})" placeholder="Describe this element in detail…">${esc(el.desc||'')}</textarea></div>
+      ${textRow}
+      <div class="field">
+        <label>Bounding box <span style="font-weight:400;text-transform:none;letter-spacing:0">— [ymin, xmin, ymax, xmax] on 0–1000 scale</span></label>
+        <div class="bbox-grid">
+          ${['ymin','xmin','ymax','xmax'].map((k,j)=>`<div class="bbox-cell"><label>${k}</label><input type="text" class="bbox-${k}" value="${b[j]||0}" oninput="onElChange(${i})" style="text-align:center"></div>`).join('')}
+        </div>
+        <div class="field-hint">Values 0–1000, independent of output resolution. Tip: drag the box on the image to move it, drag a corner to resize, or click the × on the selected box to delete it.</div>
+      </div>
+      <div class="field">
+        <label>Element color palette</label>
+        <div class="palette-row elp-row-${i}">${elPalette}</div>
+        <div class="add-color-row">
+          <input type="color" id="elp-picker-${i}" value="#888888">
+          <button class="tbar-btn" onclick="addElColor(${i})" style="font-size:12px;padding:5px 9px"><i class="ti ti-plus"></i> Add</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleSection(id){
+  const body=document.getElementById('body-'+id);
+  const caret=document.getElementById('caret-'+id);
+  const isOpen=body.classList.contains('open');
+  body.classList.toggle('open',!isOpen);
+  caret.classList.toggle('open',!isOpen);
+}
+function toggleEl(i){
+  const body=document.getElementById('elbody-'+i);
+  const caret=document.getElementById('elcaret-'+i);
+  const isOpen=body.classList.contains('open');
+  body.classList.toggle('open',!isOpen);
+  if(caret)caret.style.transform=isOpen?'':'rotate(180deg)';
+  if(!isOpen)highlightElement(i);
+  else if(selectedIdx===i)deselectElement();
+}
+
+function highlightElement(idx){
+  selectedIdx=idx;
+  document.querySelectorAll('.el-card').forEach((c,i)=>{
+    c.classList.toggle('el-highlight',i===idx);
+  });
+  drawBboxes(idx);
+}
+
+function deselectElement(){
+  selectedIdx=null;
+  document.querySelectorAll('.el-card').forEach(c=>c.classList.remove('el-highlight'));
+  drawBboxes(null);
+}
+
+function selectElement(i){
+  const body=document.getElementById('elbody-'+i);
+  if(body&&!body.classList.contains('open')){
+    if(!document.getElementById('body-elements').classList.contains('open'))toggleSection('elements');
+    toggleEl(i);
+  }else{
+    highlightElement(i);
+  }
+  const card=document.getElementById('elcard-'+i);
+  if(card)card.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+function imgMetrics(){
+  const imgEl=document.getElementById('img-wrap').querySelector('img');
+  if(!imgEl||!imgEl.complete)return null;
+  const rect=imgEl.getBoundingClientRect();
+  const wrapRect=imgEl.parentElement.getBoundingClientRect();
+  return{ox:rect.left-wrapRect.left,oy:rect.top-wrapRect.top,iw:rect.width,ih:rect.height,wrapRect};
+}
+function boxToScreen(b,m){
+  const x=m.ox+(b[1]/1000)*m.iw, y=m.oy+(b[0]/1000)*m.ih;
+  const w=(b[3]-b[1])/1000*m.iw, h=(b[2]-b[0])/1000*m.ih;
+  return{x,y,w,h};
+}
+function screenToBboxPt(px,py,m){
+  return{bx:((px-m.ox)/m.iw)*1000, by:((py-m.oy)/m.ih)*1000};
+}
+
+function drawBboxes(highlighted=selectedIdx){
+  const canvas=document.getElementById('bbox-canvas');
+  const m=imgMetrics();
+  if(!m)return;
+  canvas.width=m.wrapRect.width; canvas.height=m.wrapRect.height;
+  canvas.style.width=m.wrapRect.width+'px'; canvas.style.height=m.wrapRect.height+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const d=dataset[current];
+  const els=(d.data.compositional_deconstruction||{}).elements||[];
+  hitAreas={handles:{},delBtn:null,boxes:[]};
+  els.forEach((el,i)=>{
+    const b=el.bbox;if(!b||b.every(v=>v===0)){hitAreas.boxes[i]=null;return}
+    const{x,y,w,h}=boxToScreen(b,m);
+    hitAreas.boxes[i]={x,y,w,h};
+    const isHi=i===highlighted;
+    const labelColor=el.type==='text'?(isHi?'#185FA5':'#85B7EB'):(isHi?'#0F6E56':'#5DCAA5');
+    ctx.strokeStyle=labelColor;
+    ctx.lineWidth=isHi?2:1;
+    ctx.strokeRect(x,y,w,h);
+    if(isHi){
+      ctx.fillStyle=el.type==='text'?'rgba(55,138,221,0.08)':'rgba(29,158,117,0.08)';
+      ctx.fillRect(x,y,w,h);
+    }
+    const solidLabelColor=el.type==='text'?'#185FA5':'#0F6E56';
+    ctx.fillStyle=solidLabelColor;
+    ctx.font='bold 11px sans-serif';
+    const labelW=w<44?44:w;
+    ctx.fillRect(x,y-15,labelW+(isHi?16:0),15);
+    ctx.fillStyle='white';
+    const label=el.type==='text'?(el.text?`"${el.text.slice(0,12)}"`:el.desc?.slice(0,12)||'text'):el.desc?.slice(0,12)||'obj';
+    ctx.fillText(`${i+1}. ${label}`,x+3,y-4);
+    if(isHi){
+      const delX=x+labelW,delY=y-15,delW=16,delH=15;
+      ctx.strokeStyle='white';ctx.lineWidth=1.3;
+      ctx.beginPath();
+      ctx.moveTo(delX+5,delY+4);ctx.lineTo(delX+11,delY+11);
+      ctx.moveTo(delX+11,delY+4);ctx.lineTo(delX+5,delY+11);
+      ctx.stroke();
+      hitAreas.delBtn={x:delX,y:delY,w:delW,h:delH,idx:i};
+      const hs=7;
+      const corners={nw:{x,y},ne:{x:x+w,y},sw:{x,y:y+h},se:{x:x+w,y:y+h}};
+      Object.entries(corners).forEach(([key,pt])=>{
+        ctx.fillStyle='white';
+        ctx.fillRect(pt.x-hs/2,pt.y-hs/2,hs,hs);
+        ctx.strokeStyle=solidLabelColor;ctx.lineWidth=1.3;
+        ctx.strokeRect(pt.x-hs/2,pt.y-hs/2,hs,hs);
+        hitAreas.handles[key]={x:pt.x-hs,y:pt.y-hs,w:hs*2,h:hs*2,idx:i};
+      });
+    }
+  });
+}
+
+function canvasPoint(e){
+  const canvas=document.getElementById('bbox-canvas');
+  const r=canvas.getBoundingClientRect();
+  return{x:e.clientX-r.left,y:e.clientY-r.top};
+}
+function pointInRect(p,r){return!!r&&p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h}
+
+function onCanvasMouseDown(e){
+  if(!dataset.length)return;
+  const m=imgMetrics();if(!m)return;
+  const p=canvasPoint(e);
+  if(hitAreas.delBtn&&pointInRect(p,hitAreas.delBtn)){
+    e.preventDefault();
+    removeElement(hitAreas.delBtn.idx);
+    return;
+  }
+  for(const key of['nw','ne','sw','se']){
+    const h=hitAreas.handles[key];
+    if(h&&pointInRect(p,h)){
+      e.preventDefault();
+      const el=dataset[current].data.compositional_deconstruction.elements[h.idx];
+      dragState={mode:'resize',idx:h.idx,handle:key,orig:[...el.bbox]};
+      document.body.style.userSelect='none';
+      document.addEventListener('mousemove',onCanvasMouseMove);
+      document.addEventListener('mouseup',onCanvasMouseUp);
+      return;
+    }
+  }
+  const els=(dataset[current].data.compositional_deconstruction||{}).elements||[];
+  for(let i=els.length-1;i>=0;i--){
+    const r=hitAreas.boxes[i];
+    if(r&&pointInRect(p,r)){
+      e.preventDefault();
+      selectElement(i);
+      const{bx,by}=screenToBboxPt(p.x,p.y,m);
+      dragState={mode:'move',idx:i,startBx:bx,startBy:by,orig:[...els[i].bbox]};
+      document.body.style.userSelect='none';
+      document.addEventListener('mousemove',onCanvasMouseMove);
+      document.addEventListener('mouseup',onCanvasMouseUp);
+      return;
+    }
+  }
+  if(selectedIdx!==null)deselectElement();
+}
+
+function onCanvasMouseMove(e){
+  const m=imgMetrics();if(!m)return;
+  const canvas=document.getElementById('bbox-canvas');
+  if(!dragState){
+    const p=canvasPoint(e);
+    let cursor='default';
+    if(hitAreas.delBtn&&pointInRect(p,hitAreas.delBtn))cursor='pointer';
+    else if(['nw','se'].some(k=>hitAreas.handles[k]&&pointInRect(p,hitAreas.handles[k])))cursor='nwse-resize';
+    else if(['ne','sw'].some(k=>hitAreas.handles[k]&&pointInRect(p,hitAreas.handles[k])))cursor='nesw-resize';
+    else{
+      const els=(dataset[current]?.data.compositional_deconstruction||{}).elements||[];
+      for(let i=els.length-1;i>=0;i--){if(hitAreas.boxes[i]&&pointInRect(p,hitAreas.boxes[i])){cursor='move';break}}
+    }
+    canvas.style.cursor=cursor;
+    return;
+  }
+  const p=canvasPoint(e);
+  const{bx,by}=screenToBboxPt(p.x,p.y,m);
+  const el=dataset[current].data.compositional_deconstruction.elements[dragState.idx];
+  const[ymin,xmin,ymax,xmax]=dragState.orig;
+  const clamp=(v)=>Math.max(0,Math.min(1000,v));
+  if(dragState.mode==='move'){
+    const dx=bx-dragState.startBx, dy=by-dragState.startBy;
+    const hgt=ymax-ymin, wid=xmax-xmin;
+    let nymin=ymin+dy, nymax=ymax+dy, nxmin=xmin+dx, nxmax=xmax+dx;
+    if(nymin<0){nymin=0;nymax=hgt}
+    if(nymax>1000){nymax=1000;nymin=1000-hgt}
+    if(nxmin<0){nxmin=0;nxmax=wid}
+    if(nxmax>1000){nxmax=1000;nxmin=1000-wid}
+    el.bbox=[Math.round(nymin),Math.round(nxmin),Math.round(nymax),Math.round(nxmax)];
+  }else if(dragState.mode==='resize'){
+    let nymin=ymin,nxmin=xmin,nymax=ymax,nxmax=xmax;
+    const cbx=clamp(bx),cby=clamp(by);
+    if(dragState.handle==='nw'){nymin=Math.min(cby,ymax-5);nxmin=Math.min(cbx,xmax-5)}
+    if(dragState.handle==='ne'){nymin=Math.min(cby,ymax-5);nxmax=Math.max(cbx,xmin+5)}
+    if(dragState.handle==='sw'){nymax=Math.max(cby,ymin+5);nxmin=Math.min(cbx,xmax-5)}
+    if(dragState.handle==='se'){nymax=Math.max(cby,ymin+5);nxmax=Math.max(cbx,xmin+5)}
+    el.bbox=[Math.round(nymin),Math.round(nxmin),Math.round(nymax),Math.round(nxmax)];
+  }
+  syncBboxInputs(dragState.idx,el.bbox);
+  drawBboxes(dragState.idx);
+}
+
+function onCanvasMouseUp(){
+  document.removeEventListener('mousemove',onCanvasMouseMove);
+  document.removeEventListener('mouseup',onCanvasMouseUp);
+  document.body.style.userSelect='';
+  if(dragState){
+    onElChange(dragState.idx);
+    dragState=null;
+  }
+}
+
+function syncBboxInputs(idx,bbox){
+  const card=document.getElementById('elcard-'+idx);
+  if(!card)return;
+  ['ymin','xmin','ymax','xmax'].forEach((k,j)=>{
+    const inp=card.querySelector('.bbox-'+k);
+    if(inp)inp.value=bbox[j];
+  });
+}
+
+function getFormData(){
+  const sd={};
+  const a=v('f-aesthetics');if(a)sd.aesthetics=a;
+  const l=v('f-lighting');if(l)sd.lighting=l;
+  const m=v('f-medium');if(m)sd.medium=m;
+  const pa=v('f-photoart');
+  const mode=photoArtMode[current]||'photo';
+  if(pa){sd[mode==='photo'?'photo':'art_style']=pa}
+  const gpal=Array.from(document.querySelectorAll('#global-chips .chip')).map(c=>{
+    const sw=c.querySelector('.chip-sw');
+    return sw?sw.style.backgroundColor||sw.style.background||'':'';
+  }).filter(c=>c).map(c=>c.replace(/^rgb\(.*?\)$/,'').replace(/\s+/g,''));
+  if(gpal.length)sd.color_palette=gpal;
+
+  const elements=Array.from(document.querySelectorAll('.el-card')).map(card=>{
+    const type=card.dataset.type;
+    const el={type};
+    const desc=card.querySelector('.el-desc')?.value.trim();if(desc)el.desc=desc;
+    if(type==='text'){const t=card.querySelector('.el-text')?.value.trim();if(t)el.text=t}
+    const bbox=['ymin','xmin','ymax','xmax'].map(k=>parseInt(card.querySelector('.bbox-'+k)?.value)||0);
+    if(bbox.some(v=>v>0))el.bbox=bbox;
+    const epal=Array.from(card.querySelectorAll('.chip .chip-sw')).map(c=>{
+      return c.style.backgroundColor||c.style.background||'';
+    }).filter(c=>c).map(c=>c.replace(/^rgb\(.*?\)$/,'').replace(/\s+/g,''));
+    if(epal.length)el.color_palette=epal;
+    return el;
+  });
+
+  const result={};
+  const hld=v('f-hld');if(hld)result.high_level_description=hld;
+  if(Object.keys(sd).length)result.style_description=sd;
+  result.compositional_deconstruction={background:v('f-bg')||'',elements};
+  return result;
+}
+
+function v(id){return document.getElementById(id)?.value.trim()||''}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+function onFormChange(){
+  modified.add(current);
+  dataset[current].data=getFormData();
+  document.getElementById('unsaved-dot').style.display='inline-block';
+  updateSidebar();
+  drawBboxes();
+}
+
+function onElChange(i){
+  onFormChange();
+  const card=document.getElementById('elcard-'+i);
+  const desc=card?.querySelector('.el-desc')?.value||'';
+  const text=card?.querySelector('.el-text')?.value||'';
+  const preview=(desc||text||'element').slice(0,40);
+  const titleEl=card?.querySelector('.el-card-title');
+  if(titleEl)titleEl.textContent=preview+(preview.length>=40?'…':'');
+}
+
+function addElement(type){
+  const d=dataset[current];
+  if(!d.data.compositional_deconstruction)d.data.compositional_deconstruction={background:'',elements:[]};
+  if(!d.data.compositional_deconstruction.elements)d.data.compositional_deconstruction.elements=[];
+  d.data.compositional_deconstruction.elements.push({type,desc:'',bbox:[0,0,0,0]});
+  modified.add(current);
+  renderElements(d.data.compositional_deconstruction.elements);
+  const newEl=document.getElementById('elbody-'+(d.data.compositional_deconstruction.elements.length-1));
+  if(newEl){newEl.classList.add('open');const fc=newEl.querySelector('textarea');if(fc)fc.focus()}
+  if(!document.getElementById('body-elements').classList.contains('open'))toggleSection('elements');
+}
+
+function removeElement(i){
+  const d=dataset[current];
+  d.data.compositional_deconstruction.elements.splice(i,1);
+  modified.add(current);
+  selectedIdx=null;
+  dragState=null;
+  renderElements(d.data.compositional_deconstruction.elements);
+  drawBboxes(null);
+  updateSidebar();
+}
+
+function addColor(scope){
+  const picker=document.getElementById(scope==='global'?'global-picker':'elp-picker-'+scope);
+  const color=picker.value;
+  if(scope==='global'){
+    const d=dataset[current];
+    if(!d.data.style_description)d.data.style_description={};
+    const pal=d.data.style_description.color_palette||[];
+    pal.push(color);d.data.style_description.color_palette=pal;
+    renderGlobalPalette(pal);
+  }
+  onFormChange();
+}
+
+function addElColor(i){
+  const picker=document.getElementById('elp-picker-'+i);
+  const color=picker.value;
+  const d=dataset[current];
+  const el=d.data.compositional_deconstruction.elements[i];
+  if(!el.color_palette)el.color_palette=[];
+  el.color_palette.push(color);
+  const row=document.querySelector('.elp-row-'+i);
+  if(row){
+    const chip=document.createElement('span');chip.className='chip';
+    chip.innerHTML=`<span class="chip-sw" style="background:${color}"></span>${color}<button class="chip-del" onclick="removeElColor(${i},${el.color_palette.length-1})" title="Remove">×</button>`;
+    row.appendChild(chip);
+  }
+  onFormChange();
+}
+
+function removeColor(scope,idx){
+  if(scope==='global'){
+    const d=dataset[current];
+    const pal=(d.data.style_description?.color_palette||[]);
+    pal.splice(idx,1);
+    renderGlobalPalette(pal);
+  }
+  onFormChange();
+}
+
+function removeElColor(elIdx,colorIdx){
+  const d=dataset[current];
+  const el=d.data.compositional_deconstruction.elements[elIdx];
+  if(el?.color_palette)el.color_palette.splice(colorIdx,1);
+  const card=document.getElementById('elcard-'+elIdx);
+  const chips=Array.from(card?.querySelectorAll('.chip')||[]);
+  chips[colorIdx]?.remove();
+  onFormChange();
+}
+
+async function saveCurrentJson(){
+  dataset[current].data=getFormData();
+  const d=dataset[current];
+  if(!d.jsonName)d.jsonName=d.base+'.json';
+  const json=JSON.stringify(d.data,null,2);
+  if(d.jsonHandle){
+    try{
+      const w=await d.jsonHandle.createWritable();
+      await w.write(json);await w.close();
+    }catch(e){
+      const b=new Blob([json],{type:'application/json'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();
+    }
+  }else{
+    const b=new Blob([json],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();
+  }
+  modified.delete(current);
+  document.getElementById('unsaved-dot').style.display='none';
+  updateSidebar();
+  const si=document.getElementById('save-indicator');
+  si.classList.add('show');setTimeout(()=>si.classList.remove('show'),2000);
+}
+
+async function saveAll(){
+  for(let i=0;i<dataset.length;i++){
+    const d=dataset[i];
+    if(!d.jsonName)d.jsonName=d.base+'.json';
+    d.data=getFormData();
+    const json=JSON.stringify(d.data,null,2);
+    if(d.jsonHandle){
+      try{const w=await d.jsonHandle.createWritable();await w.write(json);await w.close();}
+      catch(e){const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();await new Promise(r=>setTimeout(r,120));}
+    }else{
+      const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();await new Promise(r=>setTimeout(r,120));
+    }
+  }
+  modified.clear();updateSidebar();
+  document.getElementById('unsaved-dot').style.display='none';
+  const si=document.getElementById('save-indicator');si.textContent='✓ All saved';si.classList.add('show');
+  setTimeout(()=>{si.classList.remove('show');si.textContent='✓ Saved'},2500);
+}
+
+async function fileToBase64(file){
+  const buf=await file.arrayBuffer();
+  return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));
+}
+
+async function callCaption(base64,instructions){
+  const r=await fetch(serverUrl+'/api/caption',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:base64,instructions})});
+  const j=await r.json();
+  if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
+  if(!j.data)throw new Error('model returned no structured caption'+(j.raw?(' (raw: '+String(j.raw).slice(0,80)+'…)'):''));
+  return j.data;
+}
+
+async function writeJsonFor(d,data){
+  if(!d.jsonName)d.jsonName=d.base+'.json';
+  d.data=data;
+  const json=JSON.stringify(data,null,2);
+  if(d.jsonHandle){
+    try{const w=await d.jsonHandle.createWritable();await w.write(json);await w.close();}
+    catch(e){const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();}
+  }else{
+    const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();
+  }
+  modified.delete(d===dataset[current]?current:-1);
+  updateSidebar();
+}
+
+async function captionCurrent(){
+  if(aiBusy||!serverUrl)return;
+  const d=dataset[current];if(!d)return;
+  if(modified.has(current))await saveCurrentJson();
+  aiBusy=true;updateAiButtons();
+  try{
+    setAiStatus('busy',`Captioning ${d.base}…`);
+    const file=await d.imgHandle.getFile();
+    const b64=await fileToBase64(file);
+    const data=await callCaption(b64);
+    await writeJsonFor(d,data);
+    renderEntry();
+    setAiStatus('ok',`Captioned ${d.base}`);
+    const si=document.getElementById('save-indicator');si.classList.add('show');setTimeout(()=>si.classList.remove('show'),2000);
+  }catch(e){
+    setAiStatus('err','Caption failed: '+e.message);
+    alert('AI caption failed: '+e.message);
+  }finally{aiBusy=false;updateAiButtons();}
+}
+
+async function captionAll(){
+  if(aiBusy||!serverUrl)return;
+  if(!confirm(`Caption all ${dataset.length} images?\n\nThis overwrites the caption on each and saves immediately. Continue?`))return;
+  aiBusy=true;updateAiButtons();
+  let ok=0,fail=0;
+  try{
+    for(let i=0;i<dataset.length;i++){
+      const d=dataset[i];
+      setAiStatus('busy',`Captioning ${i+1} / ${dataset.length} — ${d.base}`);
+      document.getElementById('progress-bar').style.width=((i)/dataset.length*100).toFixed(1)+'%';
+      try{
+        const file=await d.imgHandle.getFile();
+        const b64=await fileToBase64(file);
+        const data=await callCaption(b64);
+        await writeJsonFor(d,data);
+        if(i===current)renderEntry();
+        ok++;
+      }catch(e){
+        fail++;
+        console.error('caption failed for',d.base,e);
+      }
+    }
+    document.getElementById('progress-bar').style.width='100%';
+    setAiStatus('ok',`Done — ${ok} captioned, ${fail} failed`);
+    const si=document.getElementById('save-indicator');si.textContent='✓ '+ok+' saved';si.classList.add('show');setTimeout(()=>{si.classList.remove('show');si.textContent='✓ Saved'},3000);
+  }finally{aiBusy=false;updateAiButtons();}
+}
+
+document.addEventListener('keydown',e=>{
+  if(!dataset.length)return;
+  const tag=document.activeElement.tagName;
+  if(tag==='TEXTAREA'||tag==='INPUT')return;
+  if(e.key==='ArrowRight')navigate(1);
+  if(e.key==='ArrowLeft')navigate(-1);
+  if((e.key==='Delete'||e.key==='Backspace')&&selectedIdx!==null){e.preventDefault();removeElement(selectedIdx)}
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveCurrentJson()}
+});
+
+(function initCanvasInteraction(){
+  const canvas=document.getElementById('bbox-canvas');
+  canvas.addEventListener('mousedown',onCanvasMouseDown);
+  canvas.addEventListener('mousemove',e=>{if(!dragState)onCanvasMouseMove(e)});
+  canvas.addEventListener('mouseleave',()=>{if(!dragState)canvas.style.cursor='default'});
+})();
+</script>
