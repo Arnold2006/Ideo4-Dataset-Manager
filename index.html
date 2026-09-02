@@ -336,7 +336,6 @@ textarea:focus,input[type=text]:focus{
 let dataset=[], current=0, dirHandle=null, modified=new Set(), photoArtMode={};
 let selectedIdx=null, dragState=null, hitAreas={handles:{},delBtn:null,boxes:[]};
 let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false;
-localStorage.removeItem('ideo4_steering');
 
 async function openFolder(){
   try{
