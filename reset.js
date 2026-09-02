@@ -6,7 +6,7 @@ module.exports = {
     },
     {
       method: "fs.rm",
-      params: { path: "app/bin" }
+      params: { path: "bin" }
     },
     {
       method: "fs.rm",

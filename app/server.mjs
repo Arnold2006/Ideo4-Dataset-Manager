@@ -55,13 +55,15 @@ function resolveModels() {
 
 function resolveLlamaServer() {
   const candidates = [
+    path.join(__dirname, '..', 'bin', 'llama-server.exe'),
+    path.join(__dirname, '..', 'bin', 'llama-server'),
     path.join(__dirname, 'bin', 'llama-server.exe'),
     path.join(__dirname, 'bin', 'llama-server'),
   ]
   for (const c of candidates) {
     if (fs.existsSync(c)) return c
   }
-  throw new Error('llama-server binary not found in app/bin/. Run the install script to download it.')
+  throw new Error('llama-server binary not found in bin/. Run the install script to download it.')
 }
 
 async function waitForLlama(baseUrl, timeoutMs = 180000) {

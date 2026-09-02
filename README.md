@@ -17,7 +17,7 @@ project-root/
 │   ├── server.mjs          # Node HTTP server: /api/caption (spawns llama-server)
 │   ├── download-llama.mjs  # Downloads prebuilt llama.cpp binaries (Windows/Linux)
 │   ├── package.json
-│   ├── bin/                # llama-server binary (downloaded by install.js)  [gitignored]
+├── bin/                    # llama-server binary (downloaded by install.js)  [gitignored]
 │   ├── models/             # GGUF model + mmproj (downloaded by install.js) [gitignored]
 │   └── server-info.json    # written at runtime                              [gitignored]
 ├── ideogram4_dataset_editor_v4_FORCED_DARK.html   # the UI (served by the server)
@@ -133,7 +133,7 @@ console.log((await r.json()).data);
 | `PORT`       | `8123` (or Pinokio `{{port}}`)   | Port the HTTP server listens on       |
 | `MODELS_DIR` | `app/models`                     | Where the GGUF model + mmproj live    |
 
-The llama.cpp binary is expected in `app/bin/` (downloaded by `install.js` via `download-llama.mjs`).
+The llama.cpp binary is expected in `bin/` (downloaded by `install.js` via `download-llama.mjs`).
 
 The default model is `Huihui-Qwen3-VL-4B-Instruct-abliterated-Q4_K_M.gguf` with `mmproj-F16.gguf`
 (downloaded from Hugging Face). Place any other GGUF vision model + matching mmproj in `app/models/`

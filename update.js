@@ -18,7 +18,7 @@ module.exports = {
       params: {
         path: "app",
         message: [
-          "if (Test-Path bin\\llama-server.exe) { Write-Host 'llama-server already present, skipping' } else { node download-llama.mjs }"
+          "if (Test-Path ..\\bin\\llama-server.exe) { Write-Host 'llama-server already present, skipping' } else { node download-llama.mjs }"
         ]
       }
     },
