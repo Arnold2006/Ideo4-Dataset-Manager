@@ -868,15 +868,14 @@ async function saveCurrentJson(){
   const d=dataset[current];
   if(!d.jsonName)d.jsonName=d.base+'.json';
   const json=JSON.stringify(d.data,null,2);
+  let wrote=false;
   if(d.jsonHandle){
-    try{
-      const w=await d.jsonHandle.createWritable();
-      await w.write(json);await w.close();
-    }catch(e){
-      const b=new Blob([json],{type:'application/json'});
-      const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();
-    }
-  }else{
+    try{const w=await d.jsonHandle.createWritable();await w.write(json);await w.close();wrote=true;}catch(e){}
+  }
+  if(!wrote && dirHandle){
+    try{const fh=await dirHandle.getFileHandle(d.jsonName,{create:true});const w=await fh.createWritable();await w.write(json);await w.close();wrote=true;d.jsonHandle=fh;}catch(e){}
+  }
+  if(!wrote){
     const b=new Blob([json],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();
   }
@@ -893,10 +892,14 @@ async function saveAll(){
     if(!d.jsonName)d.jsonName=d.base+'.json';
     d.data=getFormData();
     const json=JSON.stringify(d.data,null,2);
+    let wrote=false;
     if(d.jsonHandle){
-      try{const w=await d.jsonHandle.createWritable();await w.write(json);await w.close();}
-      catch(e){const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();await new Promise(r=>setTimeout(r,120));}
-    }else{
+      try{const w=await d.jsonHandle.createWritable();await w.write(json);await w.close();wrote=true;}catch(e){}
+    }
+    if(!wrote && dirHandle){
+      try{const fh=await dirHandle.getFileHandle(d.jsonName,{create:true});const w=await fh.createWritable();await w.write(json);await w.close();wrote=true;d.jsonHandle=fh;}catch(e){}
+    }
+    if(!wrote){
       const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();await new Promise(r=>setTimeout(r,120));
     }
   }
@@ -929,10 +932,14 @@ async function writeJsonFor(d,data){
   if(!d.jsonName)d.jsonName=d.base+'.json';
   d.data=data;
   const json=JSON.stringify(data,null,2);
+  let wrote=false;
   if(d.jsonHandle){
-    try{const w=await d.jsonHandle.createWritable();await w.write(json);await w.close();}
-    catch(e){const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();}
-  }else{
+    try{const w=await d.jsonHandle.createWritable();await w.write(json);await w.close();wrote=true;}catch(e){}
+  }
+  if(!wrote && dirHandle){
+    try{const fh=await dirHandle.getFileHandle(d.jsonName,{create:true});const w=await fh.createWritable();await w.write(json);await w.close();wrote=true;}catch(e){}
+  }
+  if(!wrote){
     const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.jsonName;a.click();
   }
   modified.delete(d===dataset[current]?current:-1);
