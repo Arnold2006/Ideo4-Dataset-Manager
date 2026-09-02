@@ -129,8 +129,9 @@ function hoistToBinRoot(binDir) {
 
 // ── fetch release info ────────────────────────────────────────────────────────
 console.log("Fetching latest llama.cpp release info...");
-const release = JSON.parse(await getText("https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"));
-console.log(`Latest release: ${release.tag_name}`);
+const releases = JSON.parse(await getText("https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=10"));
+const release = releases.find(r => (r.assets || []).length > 0) || releases[0];
+console.log(`Using release: ${release.tag_name} (${release.assets.length} assets)`);
 
 if (IS_WINDOWS) {
   // ── Windows: CUDA 12.4 binary + cudart DLLs ──────────────────────────────
