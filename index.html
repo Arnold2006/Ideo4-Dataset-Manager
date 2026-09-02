@@ -38,7 +38,15 @@ body{font-family:var(--font-sans);font-size:14px;color:var(--color-text-primary)
 #server-bar input[type=text]{width:280px;font-size:12px;padding:5px 8px}
 #server-bar .tbar-btn{font-size:12px;padding:4px 9px}
 #server-bar .tbar-btn.active{background:#8b5cf6;color:#fff}
-#steer-panel{display:inline-flex;align-items:center;gap:8px;flex:1;min-width:300px}
+#steer-overlay{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);align-items:center;justify-content:center}
+#steer-overlay.open{display:flex}
+#steer-modal{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:12px;width:520px;max-width:92vw;box-shadow:0 16px 48px rgba(0,0,0,0.25)}
+#steer-modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:0.5px solid var(--color-border-tertiary);font-weight:500;font-size:14px}
+#steer-modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--color-text-secondary)}
+#steer-modal-body ul{margin:0 0 4px 18px;line-height:1.7}
+#steer-modal-body label{font-weight:500;color:var(--color-text-primary)}
+#steer-modal-body textarea{width:100%;font-size:13px;padding:8px 10px;resize:vertical;min-height:80px}
+#steer-modal-hint{font-size:11px;color:var(--color-text-tertiary)}
 
 #workspace{display:flex;flex:1;overflow:hidden}
 #sidebar{width:460px;border-right:0.5px solid var(--color-border-tertiary);overflow-y:auto;flex-shrink:0;display:none;background:var(--color-background-primary)}
@@ -195,9 +203,26 @@ textarea:focus,input[type=text]:focus{
     <span class="lbl"><span class="dot" id="server-dot"></span> Caption server</span>
     <span id="server-state" style="color:var(--color-text-tertiary)">not connected</span>
     <span class="tsep"></span>
-    <button class="tbar-btn" id="btn-steer" onclick="toggleSteer()"><i class="ti ti-steering-wheel"></i> Steer captioning</button>
-    <div id="steer-panel" style="display:none">
-      <input type="text" id="steer-input" placeholder="e.g. Add the word &quot;Sarah&quot; as a prefix to high_level_description" style="max-width:480px" oninput="localStorage.setItem('ideo4_steering',this.value)">
+    <button class="tbar-btn" id="btn-steer" onclick="openSteer()"><i class="ti ti-steering-wheel"></i> Steer captioning</button>
+  </div>
+
+  <div id="steer-overlay" onclick="if(event.target===this)closeSteer()">
+    <div id="steer-modal">
+      <div id="steer-modal-hdr">
+        <span><i class="ti ti-steering-wheel" style="font-size:16px"></i> Steer captioning</span>
+        <button class="tbar-btn" onclick="closeSteer()" style="padding:3px 8px"><i class="ti ti-x"></i></button>
+      </div>
+      <div id="steer-modal-body">
+        <p>Give the AI a direction for every caption it generates. This text is appended to the system prompt, so use it for things like:</p>
+        <ul>
+          <li>Activation words: <em>"Prefix high_level_description with the word 'Sarah'"</em></li>
+          <li>Style direction: <em>"Describe everything in a cinematic, moody tone"</em></li>
+          <li>Consistency: <em>"Always mention the person is a young woman with short dark hair"</em></li>
+        </ul>
+        <label>Steering instructions</label>
+        <textarea id="steer-input" rows="5" placeholder="e.g. Add the word &quot;Sarah&quot; as a prefix to high_level_description" oninput="localStorage.setItem('ideo4_steering',this.value)"></textarea>
+        <div id="steer-modal-hint">Leave empty for no steering. Applies to both single and batch captions.</div>
+      </div>
     </div>
   </div>
 
@@ -408,11 +433,15 @@ async function checkServer(){
   catch(e){markServer(false)}
 }
 
-function toggleSteer(){
-  const p=document.getElementById('steer-panel'),b=document.getElementById('btn-steer');
-  const open=p.style.display==='none';
-  p.style.display=open?'inline-flex':'none';
-  if(open){const v=localStorage.getItem('ideo4_steering')||'';document.getElementById('steer-input').value=v;if(v)b.classList.add('active')}
+function openSteer(){
+  const v=localStorage.getItem('ideo4_steering')||'';
+  document.getElementById('steer-input').value=v;
+  document.getElementById('steer-overlay').classList.add('open');
+  document.getElementById('steer-input').focus();
+}
+
+function closeSteer(){
+  document.getElementById('steer-overlay').classList.remove('open');
 }
 
 function getSteering(){
@@ -1012,6 +1041,7 @@ async function captionAll(){
 }
 
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){const ov=document.getElementById('steer-overlay');if(ov.classList.contains('open'))closeSteer();return}
   if(!dataset.length)return;
   const tag=document.activeElement.tagName;
   if(tag==='TEXTAREA'||tag==='INPUT')return;
