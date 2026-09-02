@@ -12,9 +12,6 @@ const URL = `http://127.0.0.1:${PORT}`
 const MODELS_DIR = process.env.MODELS_DIR || path.join(__dirname, 'models')
 const MAX_BODY = 100 * 1024 * 1024
 
-const DEFAULT_MODEL = 'llava-qwen2-7b-32k-instruct-q5_K_M.gguf'
-const DEFAULT_MMPROJ = 'mmproj-model-f16.gguf'
-
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = []
@@ -43,28 +40,28 @@ function send(res, code, obj) {
   res.end(body)
 }
 
-async function resolveModelPath(req) {
-  const m = req.headers['x-model'] || DEFAULT_MODEL
-  const p = path.join(MODELS_DIR, m)
-  if (fs.existsSync(p)) return p
-  const dir = path.join(MODELS_DIR, path.basename(path.dirname(m)))
-  if (fs.existsSync(path.join(dir, m))) return path.join(dir, m)
-  return p
+function resolveModels() {
+  if (!fs.existsSync(MODELS_DIR)) {
+    throw new Error('No models/ directory. Run the install script first.')
+  }
+  const files = fs.readdirSync(MODELS_DIR)
+  const modelFile = files
+    .filter(f => f.toLowerCase().endsWith('.gguf') && !f.toLowerCase().startsWith('mmproj'))
+    .sort()[0]
+  if (!modelFile) throw new Error('No model .gguf found in app/models/')
+  const mmprojFile = files.find(f => f.toLowerCase().startsWith('mmproj') && f.toLowerCase().endsWith('.gguf'))
+  return { modelFile: path.join(MODELS_DIR, modelFile), mmprojFile: mmprojFile ? path.join(MODELS_DIR, mmprojFile) : null }
 }
 
-async function resolveMmprojPath(req) {
-  const m = req.headers['x-mmproj'] || DEFAULT_MMPROJ
-  const p = path.join(MODELS_DIR, m)
-  if (fs.existsSync(p)) return p
-  return p
-}
-
-function pickMmproj(modelFile, modelDir, mmprojFile, mmprojDir) {
-  if (mmprojFile && fs.existsSync(mmprojFile)) return mmprojFile
-  if (mmprojDir && fs.existsSync(mmprojDir)) return mmprojDir
-  const local = path.join(path.dirname(modelFile), 'mmproj-model-f16.gguf')
-  if (fs.existsSync(local)) return local
-  return null
+function resolveLlamaServer() {
+  const candidates = [
+    path.join(__dirname, 'bin', 'llama-server.exe'),
+    path.join(__dirname, 'bin', 'llama-server'),
+  ]
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c
+  }
+  throw new Error('llama-server binary not found in app/bin/. Run the install script to download it.')
 }
 
 async function waitForLlama(baseUrl, timeoutMs = 180000) {
@@ -79,14 +76,17 @@ async function waitForLlama(baseUrl, timeoutMs = 180000) {
   throw new Error('llama-server did not become ready in time')
 }
 
-function spawnLlama({ port, model, mmproj, ngl, ctx }) {
-  const bin = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
+function spawnLlama({ bin, port, model, mmproj }) {
   const args = [
-    '-m', model,
+    '--model', model,
+    '--ctx-size', '8192',
     '--port', String(port),
     '--host', '127.0.0.1',
-    '--ctx-size', String(ctx || 8192),
-    '-ngl', String(ngl || 99),
+    '--no-webui',
+    '--jinja',
+    '--n-gpu-layers', '99',
+    '--parallel', '1',
+    '--log-disable',
   ]
   if (mmproj) args.push('--mmproj', mmproj)
   console.log(`[caption] spawning: ${bin} ${args.join(' ')}`)
@@ -101,7 +101,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Model, X-Mmproj',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       })
       return res.end()
     }
@@ -120,18 +120,23 @@ const server = http.createServer(async (req, res) => {
       try { body = JSON.parse(buf.toString('utf8')) } catch (e) {
         return send(res, 400, { ok: false, error: 'invalid JSON body' })
       }
-      const { image_base64, instructions, temperature } = body
+      const { image_base64, instructions } = body
       if (!image_base64) return send(res, 400, { ok: false, error: 'missing image_base64' })
 
-      const modelPath = await resolveModelPath(req)
-      const mmprojPath = await resolveMmprojPath(req)
-      if (!fs.existsSync(modelPath)) {
-        return send(res, 404, { ok: false, error: `model not found: ${path.basename(modelPath)}` })
+      let modelPath, mmprojPath
+      try {
+        ({ modelFile: modelPath, mmprojFile: mmprojPath } = resolveModels())
+      } catch (e) {
+        return send(res, 404, { ok: false, error: e.message })
+      }
+
+      let llamaBin
+      try { llamaBin = resolveLlamaServer() } catch (e) {
+        return send(res, 500, { ok: false, error: e.message })
       }
 
       const llamaPort = 8901 + Math.floor(Math.random() * 900)
-      const mm = pickMmproj(modelPath, MODELS_DIR, mmprojPath, MODELS_DIR)
-      const proc = spawnLlama({ port: Number(llamaPort), model: modelPath, mmproj: mm, ngl: 99, ctx: 8192 })
+      const proc = spawnLlama({ bin: llamaBin, port: llamaPort, model: modelPath, mmproj: mmprojPath })
       const llamaUrl = `http://127.0.0.1:${llamaPort}`
 
       try {
@@ -157,7 +162,7 @@ const server = http.createServer(async (req, res) => {
           },
         ],
         max_tokens: 2048,
-        temperature: temperature ?? 0.2,
+        temperature: 0.2,
         response_format: { type: 'json_object' },
       }
 
@@ -195,6 +200,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`[caption] Ideogram4 caption server listening on ${URL}`)
-  const info = { url: URL, port: PORT, models_dir: MODELS_DIR, default_model: DEFAULT_MODEL, default_mmproj: DEFAULT_MMPROJ }
+  const info = { url: URL, port: PORT, models_dir: MODELS_DIR }
   fs.writeFile(path.join(__dirname, 'server-info.json'), JSON.stringify(info, null, 2), () => {})
 })

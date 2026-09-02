@@ -14,10 +14,12 @@ captioning** (single image or whole batch) powered by a local **llama.cpp** visi
 ```
 project-root/
 ├── app/
-│   ├── server.mjs          # Node HTTP server: serves the editor + /api/caption (spawns llama-server)
+│   ├── server.mjs          # Node HTTP server: /api/caption (spawns llama-server)
+│   ├── download-llama.mjs  # Downloads prebuilt llama.cpp binaries (Windows/Linux)
 │   ├── package.json
-│   ├── models/             # GGUF model + mmproj (downloaded by install.js)  [gitignored]
-│   └── server-info.json    # written at runtime                               [gitignored]
+│   ├── bin/                # llama-server binary (downloaded by install.js)  [gitignored]
+│   ├── models/             # GGUF model + mmproj (downloaded by install.js) [gitignored]
+│   └── server-info.json    # written at runtime                              [gitignored]
 ├── ideogram4_dataset_editor_v4_FORCED_DARK.html   # the UI (served by the server)
 ├── install.js              # conda llama.cpp + model download
 ├── start.js                # launches the server on a free port, writes server-info.json
@@ -35,7 +37,7 @@ returns into the dataset schema, and tears the subprocess down.
 
 ## Install & run (Pinokio)
 
-1. **Install** — installs `llama-cpp-cuda` (conda) and downloads the vision model + mmproj.
+1. **Install** — downloads prebuilt llama.cpp binaries and the Qwen3-VL-4B vision model + mmproj.
 2. **Start** — launches the editor on a free port and writes `server-info.json`.
 3. **Open Editor** — opens the web UI in your browser.
 
@@ -131,6 +133,8 @@ console.log((await r.json()).data);
 | `PORT`       | `8123` (or Pinokio `{{port}}`)   | Port the HTTP server listens on       |
 | `MODELS_DIR` | `app/models`                     | Where the GGUF model + mmproj live    |
 
-The default model is `llava-qwen2-7b-32k-instruct-q5_K_M.gguf` with `mmproj-model-f16.gguf`.
-Place any other GGUF vision model + matching mmproj in `app/models` and pass the filename via
-the `X-Model` / `X-Mmproj` headers.
+The llama.cpp binary is expected in `app/bin/` (downloaded by `install.js` via `download-llama.mjs`).
+
+The default model is `Huihui-Qwen3-VL-4B-Instruct-abliterated-Q4_K_M.gguf` with `mmproj-F16.gguf`
+(downloaded from Hugging Face). Place any other GGUF vision model + matching mmproj in `app/models/`
+and the server will auto-discover it.
