@@ -928,7 +928,9 @@ async function callCaption(base64,instructions){
   const r=await fetch(serverUrl+'/api/caption',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:base64,instructions})});
   const j=await r.json();
   if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
-  if(!j.data)throw new Error('model returned no structured caption'+(j.raw?(' (raw: '+String(j.raw).slice(0,80)+'…)'):''));
+  if(!j.data)throw new Error('model returned no structured caption'+(j.raw?(' (raw: '+String(j.raw).slice(0,120)+'…'):''));
+  const hl=String(j.data.high_level_description||'').trim();
+  if(!hl)throw new Error('model returned empty caption (high_level_description is blank)');
   return j.data;
 }
 

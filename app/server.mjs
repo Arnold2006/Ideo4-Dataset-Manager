@@ -163,7 +163,9 @@ const server = http.createServer(async (req, res) => {
       }
 
       const systemPrompt = (instructions || '').trim() ||
-        'You are an expert image captioner for fine-tuning Ideogram 4. Produce a faithful, dense, structured caption of the image. Return JSON only, no prose, matching exactly: {"high_level_description","style_description":{"aesthetics","lighting","medium","photo"|"art_style","color_palette":["#rrggbb"]},"compositional_deconstruction":{"background","elements":[{"type":"obj"|"text","desc","text","bbox":[ymin,xmin,ymax,xmax],"color_palette":[]}]}}. bbox is on a 0-1000 scale.'
+        'You are an expert image captioner for fine-tuning Ideogram 4. Look at the image carefully and produce a faithful, dense caption. Return ONLY a JSON object with no prose, no markdown, matching this structure exactly (fill in every field with real descriptions of the image):\n' +
+        '{"high_level_description":"<one paragraph describing the overall scene>","style_description":{"aesthetics":"<mood, tone>","lighting":"<type and direction>","medium":"<photo or digital art>","art_style":"<e.g. photorealistic, illustration>","color_palette":["#rrggbb","#rrggbb"]},"compositional_deconstruction":{"background":"<describe background>","elements":[{"type":"obj","desc":"<what it is>","bbox":[ymin,xmin,ymax,xmax],"color_palette":["#rrggbb"]}]}}\n' +
+        'bbox values are integers on a 0-1000 scale (ymin,xmin,ymax,xmax). Use 2-6 elements. Every string field must contain a real description, never an empty string.'
 
       const payload = {
         model: path.basename(modelPath),
