@@ -17,23 +17,16 @@ module.exports = {
       method: "shell.run",
       params: {
         path: "app",
-        message: ["node download-llama.mjs"]
+        message: [
+          "if (Test-Path bin\\llama-server.exe) { Write-Host 'llama-server already present, skipping' } else { node download-llama.mjs }"
+        ]
       }
     },
     {
-      method: "hf.download",
+      method: "shell.run",
       params: {
         path: "app",
-        "_": ["noctrex/Huihui-Qwen3-VL-4B-Instruct-abliterated-GGUF", "Huihui-Qwen3-VL-4B-Instruct-abliterated-Q4_K_M.gguf"],
-        "local-dir": "models"
-      }
-    },
-    {
-      method: "hf.download",
-      params: {
-        path: "app",
-        "_": ["noctrex/Huihui-Qwen3-VL-4B-Instruct-abliterated-GGUF", "mmproj-F16.gguf"],
-        "local-dir": "models"
+        message: ["node download-model.mjs"]
       }
     }
   ]
