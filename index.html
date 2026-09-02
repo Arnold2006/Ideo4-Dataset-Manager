@@ -31,12 +31,14 @@ body{font-family:var(--font-sans);font-size:14px;color:var(--color-text-primary)
 @keyframes spin{to{transform:rotate(360deg)}}
 #ai-status .ok{color:#1D9E75}
 #ai-status .err{color:var(--color-text-danger)}
-#server-bar{display:none;align-items:center;gap:8px;padding:5px 12px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);font-size:12px;flex-shrink:0}
+#server-bar{display:none;align-items:center;gap:8px;padding:5px 12px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);font-size:12px;flex-shrink:0;flex-wrap:wrap}
 #server-bar .lbl{color:var(--color-text-secondary);display:flex;align-items:center;gap:6px}
 #server-bar .dot{width:8px;height:8px;border-radius:50%;background:#BA7517}
 #server-bar .dot.on{background:#1D9E75}
 #server-bar input[type=text]{width:280px;font-size:12px;padding:5px 8px}
 #server-bar .tbar-btn{font-size:12px;padding:4px 9px}
+#server-bar .tbar-btn.active{background:#8b5cf6;color:#fff}
+#steer-panel{display:inline-flex;align-items:center;gap:8px;flex:1;min-width:300px}
 
 #workspace{display:flex;flex:1;overflow:hidden}
 #sidebar{width:460px;border-right:0.5px solid var(--color-border-tertiary);overflow-y:auto;flex-shrink:0;display:none;background:var(--color-background-primary)}
@@ -192,6 +194,11 @@ textarea:focus,input[type=text]:focus{
   <div id="server-bar">
     <span class="lbl"><span class="dot" id="server-dot"></span> Caption server</span>
     <span id="server-state" style="color:var(--color-text-tertiary)">not connected</span>
+    <span class="tsep"></span>
+    <button class="tbar-btn" id="btn-steer" onclick="toggleSteer()"><i class="ti ti-steering-wheel"></i> Steer captioning</button>
+    <div id="steer-panel" style="display:none">
+      <input type="text" id="steer-input" placeholder="e.g. Add the word &quot;Sarah&quot; as a prefix to high_level_description" style="max-width:480px" oninput="localStorage.setItem('ideo4_steering',this.value)">
+    </div>
   </div>
 
   <div id="workspace">
@@ -399,6 +406,18 @@ function markServer(ok){
 async function checkServer(){
   try{const r=await fetch(serverUrl+'/health',{signal:AbortSignal.timeout(2000)});if(r.ok)markServer(true);else markServer(false)}
   catch(e){markServer(false)}
+}
+
+function toggleSteer(){
+  const p=document.getElementById('steer-panel'),b=document.getElementById('btn-steer');
+  const open=p.style.display==='none';
+  p.style.display=open?'inline-flex':'none';
+  if(open){const v=localStorage.getItem('ideo4_steering')||'';document.getElementById('steer-input').value=v;if(v)b.classList.add('active')}
+}
+
+function getSteering(){
+  const el=document.getElementById('steer-input');
+  return el?el.value.trim():'';
 }
 
 function setAiStatus(kind,text){
@@ -950,7 +969,7 @@ async function captionCurrent(){
     setAiStatus('busy',`Captioning ${d.base}…`);
     const file=await d.imgHandle.getFile();
     const b64=await fileToBase64(file);
-    const data=await callCaption(b64);
+    const data=await callCaption(b64,getSteering());
     await writeJsonFor(d,data);
     renderEntry();
     setAiStatus('ok',`Captioned ${d.base}`);
@@ -974,7 +993,7 @@ async function captionAll(){
       try{
         const file=await d.imgHandle.getFile();
         const b64=await fileToBase64(file);
-        const data=await callCaption(b64);
+        const data=await callCaption(b64,getSteering());
         await writeJsonFor(d,data);
         if(i===current)renderEntry();
         ok++;
