@@ -114,6 +114,20 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { url: URL, port: PORT })
     }
 
+    if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+      const htmlPath = path.join(__dirname, '..', 'ideogram4_dataset_editor_v4_FORCED_DARK.html')
+      if (!fs.existsSync(htmlPath)) {
+        return send(res, 404, { ok: false, error: 'editor HTML not found' })
+      }
+      const html = fs.readFileSync(htmlPath, 'utf8')
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': Buffer.byteLength(html),
+        'Access-Control-Allow-Origin': '*',
+      })
+      return res.end(html)
+    }
+
     if (req.method === 'POST' && req.url === '/api/caption') {
       const buf = await readBody(req)
       let body
