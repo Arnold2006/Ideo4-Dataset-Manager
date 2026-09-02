@@ -220,7 +220,7 @@ textarea:focus,input[type=text]:focus{
           <li>Consistency: <em>"Always mention the person is a young woman with short dark hair"</em></li>
         </ul>
         <label>Steering instructions</label>
-        <textarea id="steer-input" rows="5" placeholder="e.g. Add the word &quot;Sarah&quot; as a prefix to high_level_description" oninput="localStorage.setItem('ideo4_steering',this.value)"></textarea>
+        <textarea id="steer-input" rows="5" placeholder="e.g. Add the word &quot;Sarah&quot; as a prefix to high_level_description"></textarea>
         <div id="steer-modal-hint">Leave empty for no steering. Applies to both single and batch captions.</div>
       </div>
     </div>
@@ -336,6 +336,7 @@ textarea:focus,input[type=text]:focus{
 let dataset=[], current=0, dirHandle=null, modified=new Set(), photoArtMode={};
 let selectedIdx=null, dragState=null, hitAreas={handles:{},delBtn:null,boxes:[]};
 let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false;
+localStorage.removeItem('ideo4_steering');
 
 async function openFolder(){
   try{
@@ -434,8 +435,7 @@ async function checkServer(){
 }
 
 function openSteer(){
-  const v=localStorage.getItem('ideo4_steering')||'';
-  document.getElementById('steer-input').value=v;
+  document.getElementById('steer-input').value='';
   document.getElementById('steer-overlay').classList.add('open');
   document.getElementById('steer-input').focus();
 }
