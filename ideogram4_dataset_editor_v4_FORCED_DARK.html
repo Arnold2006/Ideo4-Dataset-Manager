@@ -334,7 +334,7 @@ async function loadDataset(){
       }
       const imgFile=await pair.img.handle.getFile();
       const imgUrl=URL.createObjectURL(imgFile);
-      dataset.push({base,imgName:pair.img.name,jsonName,jsonHandle,imgUrl,data});
+      dataset.push({base,imgName:pair.img.name,jsonName,jsonHandle,imgUrl,imgHandle:pair.img.handle,data});
     }
   }
   dataset.sort((a,b)=>a.base.localeCompare(b.base));
