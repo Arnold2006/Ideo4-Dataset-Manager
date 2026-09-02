@@ -191,9 +191,6 @@ textarea:focus,input[type=text]:focus{
 
   <div id="server-bar">
     <span class="lbl"><span class="dot" id="server-dot"></span> Caption server</span>
-    <input type="text" id="server-url" placeholder="http://127.0.0.1:PORT  (auto-detected when running under Pinokio)">
-    <button class="tbar-btn" onclick="setServerUrl()"><i class="ti ti-link"></i> Set</button>
-    <button class="tbar-btn" onclick="detectServerUrl()"><i class="ti ti-scan"></i> Auto-detect</button>
     <span id="server-state" style="color:var(--color-text-tertiary)">not connected</span>
   </div>
 
@@ -371,7 +368,6 @@ function showEditor(){
   document.getElementById('counter').style.display='inline';
   document.getElementById('progress-wrap').style.display='block';
   document.getElementById('server-bar').style.display='flex';
-  if(serverUrl)document.getElementById('server-url').value=serverUrl;
   updateAiButtons();
   detectServerUrl(true);
 }
@@ -382,34 +378,27 @@ function updateAiButtons(){
   if(a)a.disabled=aiBusy||!serverUrl;
 }
 
-function setServerUrl(){
-  const v=document.getElementById('server-url').value.trim().replace(/\/+$/,'');
-  if(!v){serverUrl='';localStorage.removeItem('ideo4_server_url');updateAiButtons();markServer(false,'cleared');return}
-  serverUrl=v;localStorage.setItem('ideo4_server_url',v);updateAiButtons();
-  checkServer();
-}
-
 async function detectServerUrl(silent){
   const cands=[location.origin,'http://127.0.0.1:8123','http://localhost:8123'];
   for(const c of cands){
     try{
-      const r=await fetch(c+'/api/server-info',{signal:AbortSignal.timeout(1500)});
-      if(r.ok){const j=await r.json();const url=j.url||c;if(serverUrl!==url){serverUrl=url;localStorage.setItem('ideo4_server_url',url)}document.getElementById('server-url').value=url;updateAiButtons();markServer(true,url);return}
+      const r=await fetch(c+'/health',{signal:AbortSignal.timeout(1500)});
+      if(r.ok){if(serverUrl!==c){serverUrl=c;localStorage.setItem('ideo4_server_url',c)}updateAiButtons();markServer(true);return}
     }catch(e){}
   }
-  if(serverUrl){markServer(false,'unreachable');return}
-  if(!silent)markServer(false,'not found — enter the server URL');
+  if(serverUrl){markServer(false);return}
+  if(!silent)markServer(false);
 }
 
-function markServer(ok,msg){
+function markServer(ok){
   const dot=document.getElementById('server-dot'), st=document.getElementById('server-state');
   if(dot)dot.className='dot'+(ok?' on':'');
-  if(st){st.textContent=ok?('connected — '+msg):(msg||'not connected');st.style.color=ok?'#1D9E75':'var(--color-text-tertiary)';}
+  if(st){st.textContent=ok?'online and ready':'offline';st.style.color=ok?'#1D9E75':'var(--color-text-tertiary)';}
 }
 
 async function checkServer(){
-  try{const r=await fetch(serverUrl+'/health',{signal:AbortSignal.timeout(2000)});if(r.ok)markServer(true,serverUrl);else markServer(false,'unreachable')}
-  catch(e){markServer(false,'unreachable')}
+  try{const r=await fetch(serverUrl+'/health',{signal:AbortSignal.timeout(2000)});if(r.ok)markServer(true);else markServer(false)}
+  catch(e){markServer(false)}
 }
 
 function setAiStatus(kind,text){
