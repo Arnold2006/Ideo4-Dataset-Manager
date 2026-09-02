@@ -49,6 +49,7 @@ body{font-family:var(--font-sans);font-size:14px;color:var(--color-text-primary)
 .si-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.35);border:1px solid rgba(0,0,0,0.4);z-index:2}
 .si-dot.done{background:#1D9E75;border-color:#0F6E56}
 .si-dot.new{background:#BA7517;border-color:#8a5a12;border-style:dashed}
+.si-dot.failed{background:#DC2626;border-color:#991B1B}
 .si-newtag{position:absolute;top:6px;left:6px;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;background:#BA7517;color:#1a1205;z-index:2;letter-spacing:0.02em}
 
 #main{display:flex;flex:1;overflow:hidden}
@@ -353,7 +354,10 @@ function updateSidebar(){
   dataset.forEach((d,i)=>{
     const hasJson=!!d.jsonHandle;
     const dot=document.getElementById('sd-'+i);
-    if(dot)dot.className='si-dot'+(!hasJson?' new':(modified.has(i)?' done':''));
+    if(dot){
+      if(d.captionFailed)dot.className='si-dot failed';
+      else dot.className='si-dot'+(!hasJson?' new':(modified.has(i)?' done':''));
+    }
     const s=document.getElementById('si-'+i);if(s)s.className='si'+(i===current?' active':'');
   });
 }
@@ -983,9 +987,12 @@ async function captionAll(){
         await writeJsonFor(d,data);
         if(i===current)renderEntry();
         ok++;
+        const dot=document.getElementById('sd-'+i);if(dot)dot.className='si-dot';
       }catch(e){
         fail++;
+        d.captionFailed=true;
         console.error('caption failed for',d.base,e);
+        const dot=document.getElementById('sd-'+i);if(dot)dot.className='si-dot failed';
       }
     }
     document.getElementById('progress-bar').style.width='100%';
