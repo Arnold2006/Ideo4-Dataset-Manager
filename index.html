@@ -433,8 +433,9 @@ async function checkServer(){
   catch(e){markServer(false)}
 }
 
+let steerInitialized=false;
 function openSteer(){
-  document.getElementById('steer-input').value='';
+  if(!steerInitialized){document.getElementById('steer-input').value='';steerInitialized=true}
   document.getElementById('steer-overlay').classList.add('open');
   document.getElementById('steer-input').focus();
 }
