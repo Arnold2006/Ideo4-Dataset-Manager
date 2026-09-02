@@ -908,7 +908,13 @@ async function saveAll(){
 
 async function fileToBase64(file){
   const buf=await file.arrayBuffer();
-  return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));
+  const bytes=new Uint8Array(buf);
+  let bin='';
+  const CHUNK=0x8000;
+  for(let i=0;i<bytes.length;i+=CHUNK){
+    bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CHUNK));
+  }
+  return btoa(bin);
 }
 
 async function callCaption(base64,instructions){

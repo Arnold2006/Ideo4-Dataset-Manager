@@ -22,11 +22,8 @@ module.exports = {
           return [{
             icon: "fa-solid fa-rocket",
             text: "Open Editor",
-            click: (kernel) => {
-              const url = local.url
-              const cmd = process.platform === 'win32' ? `start "" "${url}"` : `xdg-open "${url}"`
-              kernel.shell.run(__dirname, [cmd])
-            },
+            href: local.url,
+            popout: true,
           }, {
             icon: 'fa-solid fa-terminal',
             text: "Terminal",
