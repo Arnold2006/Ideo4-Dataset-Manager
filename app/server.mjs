@@ -3,6 +3,10 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { GENERATION_SCHEMA } from './src/generation-schema.mjs'
+import { normalizeCaption, serializeCaption } from './src/normalize.mjs'
+import { validateCaption } from './src/validate.mjs'
+import { SYSTEM_PROMPT, FEW_SHOT } from './src/prompt.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -11,6 +15,7 @@ const HOST = '127.0.0.1'
 const URL = `http://127.0.0.1:${PORT}`
 const MODELS_DIR = process.env.MODELS_DIR || path.join(__dirname, 'models')
 const MAX_BODY = 100 * 1024 * 1024
+const MAX_ATTEMPTS = 3
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -97,6 +102,115 @@ function spawnLlama({ bin, port, model, mmproj }) {
   return proc
 }
 
+function buildMessages(imageBase64, instructions, lastErrors) {
+  const sysPrompt = (instructions || '').trim()
+    ? SYSTEM_PROMPT + '\n\nAdditional style guidance:\n' + instructions.trim()
+    : SYSTEM_PROMPT
+  const styleNote = '\n\nYou MUST always include the "style_description" object in your output. It is required, never optional. Choose either the photograph variant (with fields: aesthetics, lighting, photo, medium="photograph", color_palette) or the art variant (with fields: aesthetics, lighting, medium, art_style, color_palette). Always populate all fields with rich, specific values. Never omit style_description.'
+  const messages = [{ role: 'system', content: sysPrompt + styleNote }]
+
+  for (const [user, response] of FEW_SHOT) {
+    messages.push({ role: 'user', content: user })
+    messages.push({ role: 'assistant', content: response })
+  }
+
+  const errorSuffix = lastErrors.length > 0
+    ? '\n\n(Your previous answer had these problems, fix them: ' + lastErrors.join('; ') + ')'
+    : ''
+
+  const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '')
+  const userContent = [
+    {
+      type: 'image_url',
+      image_url: { url: `data:image/jpeg;base64,${base64Data}` }
+    },
+    {
+      type: 'text',
+      text: (instructions
+        ? `Analyse this image and use it as the subject. Additional context from user: ${instructions}`
+        : 'Analyse this image carefully and generate a detailed Ideogram 4 JSON prompt for it.') + errorSuffix
+    }
+  ]
+
+  messages.push({ role: 'user', content: userContent })
+  return messages
+}
+
+async function callLlamaServer(llamaUrl, messages, temperature) {
+  const res = await fetch(llamaUrl + '/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'local',
+      messages,
+      temperature,
+      max_tokens: 4096,
+      stream: false,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'ideogram_prompt', schema: GENERATION_SCHEMA, strict: true }
+      }
+    })
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`llama-server error ${res.status}: ${err.slice(0, 400)}`)
+  }
+
+  const j = await res.json()
+  return j.choices?.[0]?.message?.content || ''
+}
+
+async function generateCaption(llamaUrl, imageBase64, instructions) {
+  let lastErrors = []
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const messages = buildMessages(imageBase64, instructions, lastErrors)
+
+    let text
+    try {
+      text = await callLlamaServer(llamaUrl, messages, attempt === 1 ? 0.7 : 0.3)
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) }
+    }
+
+    let raw
+    try { raw = JSON.parse(text) }
+    catch {
+      let cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim()
+      try {
+        raw = JSON.parse(cleaned)
+      } catch {
+        const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}')
+        if (s >= 0 && e > s) {
+          try { raw = JSON.parse(cleaned.slice(s, e + 1)) } catch { lastErrors = ['output was not parseable JSON']; continue }
+        } else { lastErrors = ['output was not parseable JSON']; continue }
+      }
+    }
+
+    const normalized = normalizeCaption(raw)
+    if (!normalized.ok) { lastErrors = [normalized.reason]; continue }
+
+    const { valid, errors } = validateCaption(normalized.value)
+    if (!valid) { lastErrors = errors; continue }
+
+    return {
+      ok: true,
+      data: normalized.value,
+      prompt_compact: serializeCaption(normalized.value),
+      valid: true,
+      attempts: attempt
+    }
+  }
+
+  return {
+    ok: false,
+    error: `Could not produce a valid caption after ${MAX_ATTEMPTS} attempts.`,
+    errors: lastErrors
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'OPTIONS') {
@@ -162,57 +276,14 @@ const server = http.createServer(async (req, res) => {
         return send(res, 500, { ok: false, error: e.message })
       }
 
-      const systemPrompt = (instructions || '').trim() ||
-        'You are an expert image captioner for fine-tuning Ideogram 4. Look at the image carefully and produce a faithful, dense caption. Return ONLY a JSON object with no prose, no markdown, matching this structure exactly (fill in every field with real descriptions of the image):\n' +
-        '{"high_level_description":"<one paragraph describing the overall scene>","style_description":{"aesthetics":"<mood, tone>","lighting":"<type and direction>","medium":"<photo or digital art>","art_style":"<e.g. photorealistic, illustration>","color_palette":["#rrggbb","#rrggbb"]},"compositional_deconstruction":{"background":"<describe background>","elements":[{"type":"obj","desc":"<what it is>","bbox":[ymin,xmin,ymax,xmax],"color_palette":["#rrggbb"]}]}}\n' +
-        'bbox values are integers on a 0-1000 scale (ymin,xmin,ymax,xmax). Use 2-6 elements. Every string field must contain a real description, never an empty string.'
+      const result = await generateCaption(llamaUrl, image_base64, instructions)
 
-      const payload = {
-        model: path.basename(modelPath),
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Return the caption JSON for this image now.' },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image_base64}` } },
-            ],
-          },
-        ],
-        max_tokens: 4096,
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
+      try { proc.kill() } catch (_) {}
+
+      if (result.ok) {
+        return send(res, 200, { ok: true, data: result.data, prompt_compact: result.prompt_compact, valid: true, attempts: result.attempts })
       }
-
-      let captionText = ''
-      try {
-        const r = await fetch(llamaUrl + '/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        if (!r.ok) throw new Error(`llama-server ${r.status}: ${(await r.text()).slice(0, 400)}`)
-        const j = await r.json()
-        captionText = j.choices?.[0]?.message?.content || ''
-      } finally {
-        try { proc.kill() } catch (_) {}
-      }
-
-      let data = null
-      try {
-        let cleaned = captionText.replace(/```json/gi, '').replace(/```/g, '').trim()
-        try {
-          data = JSON.parse(cleaned)
-        } catch (_) {
-          const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}')
-          if (s >= 0 && e > s) data = JSON.parse(cleaned.slice(s, e + 1))
-          else throw new Error('no JSON object found')
-        }
-      } catch (e) {
-        return send(res, 200, { ok: true, raw: captionText, data: null, error: 'could not parse JSON: ' + e.message })
-      }
-
-      return send(res, 200, { ok: true, data })
+      return send(res, 200, { ok: false, error: result.error, errors: result.errors })
     }
 
     return send(res, 404, { ok: false, error: 'not found' })
