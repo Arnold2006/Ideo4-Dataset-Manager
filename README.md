@@ -20,7 +20,7 @@ project-root/
 ├── bin/                    # llama-server binary (downloaded by install.js)  [gitignored]
 │   ├── models/             # GGUF model + mmproj (downloaded by install.js) [gitignored]
 │   └── server-info.json    # written at runtime                              [gitignored]
-├── ideogram4_dataset_editor_v4_FORCED_DARK.html   # the UI (served by the server)
+├── index.html                                      # the UI (served by the server)
 ├── install.js              # conda llama.cpp + model download
 ├── start.js                # launches the server on a free port, writes server-info.json
 ├── reset.js                # removes model weights + runtime files

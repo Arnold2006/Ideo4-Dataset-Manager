@@ -117,7 +117,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-      const htmlPath = path.join(__dirname, '..', 'ideogram4_dataset_editor_v4_FORCED_DARK.html')
+      const htmlPath = path.join(__dirname, '..', 'index.html')
       if (!fs.existsSync(htmlPath)) {
         return send(res, 404, { ok: false, error: 'editor HTML not found' })
       }
