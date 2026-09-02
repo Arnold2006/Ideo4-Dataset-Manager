@@ -91,8 +91,8 @@ function spawnLlama({ bin, port, model, mmproj }) {
     '--log-disable',
   ]
   if (mmproj) args.push('--mmproj', mmproj)
-  console.log(`[caption] spawning: ${bin} ${args.join(' ')}`)
-  const proc = spawn(bin, args, { stdio: 'inherit' })
+  const proc = spawn(bin, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+  proc.stderr.on('data', (d) => { const s = d.toString().trim(); if (s) console.error('[llama]', s) })
   proc.on('error', (e) => console.error('[caption] llama-server spawn error:', e.message))
   return proc
 }
