@@ -177,7 +177,7 @@ const server = http.createServer(async (req, res) => {
             ],
           },
         ],
-        max_tokens: 2048,
+        max_tokens: 4096,
         temperature: 0.2,
         response_format: { type: 'json_object' },
       }
@@ -198,9 +198,14 @@ const server = http.createServer(async (req, res) => {
 
       let data = null
       try {
-        const cleaned = captionText.replace(/```json/gi, '').replace(/```/g, '').trim()
-        const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}')
-        data = JSON.parse(s >= 0 && e > s ? cleaned.slice(s, e + 1) : cleaned)
+        let cleaned = captionText.replace(/```json/gi, '').replace(/```/g, '').trim()
+        try {
+          data = JSON.parse(cleaned)
+        } catch (_) {
+          const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}')
+          if (s >= 0 && e > s) data = JSON.parse(cleaned.slice(s, e + 1))
+          else throw new Error('no JSON object found')
+        }
       } catch (e) {
         return send(res, 200, { ok: true, raw: captionText, data: null, error: 'could not parse JSON: ' + e.message })
       }
