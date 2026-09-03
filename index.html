@@ -1023,16 +1023,23 @@ async function captionCurrent(){
   }finally{aiBusy=false;updateAiButtons();}
 }
 
+function hasCaption(d){
+  return d.jsonHandle && d.data && d.data.high_level_description && d.data.high_level_description.trim();
+}
 async function captionAll(){
   if(aiBusy||!serverUrl)return;
-  if(!confirm(`Caption all ${dataset.length} images?\n\nThis overwrites the caption on each and saves immediately. Continue?`))return;
+  const pending=dataset.filter(d=>!hasCaption(d));
+  if(!pending.length){setAiStatus('ok','All images already have captions.');return}
+  if(!confirm(`Caption ${pending.length} uncaptioned image(s)?\n\nImages that already have a caption will be skipped. Continue?`))return;
   aiBusy=true;updateAiButtons();
-  let ok=0,fail=0;
+  let ok=0,fail=0,skipped=0;
+  const total=dataset.length;
   try{
-    for(let i=0;i<dataset.length;i++){
+    for(let i=0;i<total;i++){
       const d=dataset[i];
-      setAiStatus('busy',`Captioning ${i+1} / ${dataset.length} — ${d.base}`);
-      document.getElementById('progress-bar').style.width=((i)/dataset.length*100).toFixed(1)+'%';
+      if(hasCaption(d)){skipped++;continue}
+      setAiStatus('busy',`Captioning ${d.base}`);
+      document.getElementById('progress-bar').style.width=((i)/total*100).toFixed(1)+'%';
       try{
         const file=await d.imgHandle.getFile();
         const b64=await fileToBase64(file);
@@ -1049,7 +1056,7 @@ async function captionAll(){
       }
     }
     document.getElementById('progress-bar').style.width='100%';
-    setAiStatus('ok',`Done — ${ok} captioned, ${fail} failed`);
+    setAiStatus('ok',`Done — ${ok} captioned, ${skipped} skipped, ${fail} failed`);
     const si=document.getElementById('save-indicator');si.textContent='✓ '+ok+' saved';si.classList.add('show');setTimeout(()=>{si.classList.remove('show');si.textContent='✓ Saved'},3000);
   }finally{aiBusy=false;updateAiButtons();}
 }
