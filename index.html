@@ -565,6 +565,7 @@ function toggleSection(id){
   const isOpen=body.classList.contains('open');
   body.classList.toggle('open',!isOpen);
   caret.classList.toggle('open',!isOpen);
+  if(!isOpen)body.querySelectorAll('textarea,input[type=text]').forEach(ta=>{if(ta.value)autoExpandTextarea(ta)});
 }
 function toggleEl(i){
   const body=document.getElementById('elbody-'+i);
