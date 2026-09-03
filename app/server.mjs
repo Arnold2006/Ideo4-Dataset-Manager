@@ -184,7 +184,9 @@ async function generateCaption(llamaUrl, imageBase64, instructions) {
       }
     }
 
+    console.log('[caption] Raw AI response style_description:', JSON.stringify(raw.style_description))
     const normalized = normalizeCaption(raw)
+    console.log('[caption] Normalized result ok:', normalized.ok, 'style:', JSON.stringify(normalized.value?.style_description))
     if (!normalized.ok) { lastErrors = [normalized.reason]; continue }
 
     const { valid, errors } = validateCaption(normalized.value)

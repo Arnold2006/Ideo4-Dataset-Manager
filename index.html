@@ -487,6 +487,8 @@ function renderEntry(){
 function fillForm(data){
   const sd=data.style_description||{};
   const cd=data.compositional_deconstruction||{};
+  console.log('[fillForm] Received data:', JSON.stringify(data, null, 2));
+  console.log('[fillForm] style_description:', JSON.stringify(sd));
   document.getElementById('f-hld').value=data.high_level_description||'';
   document.getElementById('f-aesthetics').value=sd.aesthetics||'';
   document.getElementById('f-lighting').value=sd.lighting||'';
@@ -979,6 +981,7 @@ async function fileToBase64(file){
 async function callCaption(base64,instructions){
   const r=await fetch(serverUrl+'/api/caption',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:base64,instructions})});
   const j=await r.json();
+  console.log('[callCaption] Server response:', JSON.stringify(j, null, 2));
   if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
   if(!j.data)throw new Error('model returned no structured caption'+(j.raw?(' (raw: '+String(j.raw).slice(0,120)+'…'):''));
   const hl=String(j.data.high_level_description||'').trim();
