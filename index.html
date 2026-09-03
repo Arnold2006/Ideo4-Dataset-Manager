@@ -981,9 +981,12 @@ async function fileToBase64(file){
 async function callCaption(base64,instructions){
   const r=await fetch(serverUrl+'/api/caption',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:base64,instructions})});
   const j=await r.json();
-  console.log('[callCaption] Server response:', JSON.stringify(j, null, 2));
+  console.log('[callCaption] Server response status:', r.status, 'ok:', r.ok);
+  console.log('[callCaption] Full response:', JSON.stringify(j));
   if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
   if(!j.data)throw new Error('model returned no structured caption'+(j.raw?(' (raw: '+String(j.raw).slice(0,120)+'…'):''));
+  console.log('[callCaption] j.data keys:', Object.keys(j.data));
+  console.log('[callCaption] j.data.style_description:', JSON.stringify(j.data.style_description));
   const hl=String(j.data.high_level_description||'').trim();
   if(!hl)throw new Error('model returned empty caption (high_level_description is blank)');
   return j.data;
@@ -1008,7 +1011,8 @@ async function writeJsonFor(d,data){
 }
 
 async function captionCurrent(){
-  if(aiBusy||!serverUrl)return;
+  console.log('[captionCurrent] Starting. aiBusy:', aiBusy, 'serverUrl:', serverUrl);
+  if(aiBusy||!serverUrl){console.log('[captionCurrent] Early return');return;}
   const d=dataset[current];if(!d)return;
   if(modified.has(current))await saveCurrentJson();
   aiBusy=true;updateAiButtons();
