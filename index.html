@@ -994,6 +994,7 @@ async function callCaption(base64,instructions){
 }
 
 async function writeJsonFor(d,data){
+  console.log('[writeJsonFor] Writing data:', JSON.stringify(data, null, 2));
   if(!d.jsonName)d.jsonName=d.base+'.json';
   d.data=data;
   const json=JSON.stringify(data,null,2);

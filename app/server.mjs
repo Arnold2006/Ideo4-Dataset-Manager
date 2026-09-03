@@ -197,7 +197,8 @@ async function generateCaption(llamaUrl, imageBase64, instructions) {
       data: normalized.value,
       prompt_compact: serializeCaption(normalized.value),
       valid: true,
-      attempts: attempt
+      attempts: attempt,
+      version: 'DEBUG_20260903_v2'
     }
   }
 
