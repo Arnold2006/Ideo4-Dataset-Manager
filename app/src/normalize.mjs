@@ -60,9 +60,8 @@ function normalizeStyle(style) {
   if (typeof style !== "object" || style === null || Array.isArray(style)) {
     return null;
   }
-  const aesthetics = nonEmptyString(style.aesthetics);
-  const lighting = nonEmptyString(style.lighting);
-  if (aesthetics === null || lighting === null) return null;
+  const aesthetics = nonEmptyString(style.aesthetics) || "natural, clean";
+  const lighting = nonEmptyString(style.lighting) || "soft, even";
 
   let photo = nonEmptyString(style.photo);
   let medium = nonEmptyString(style.medium);
@@ -72,7 +71,7 @@ function normalizeStyle(style) {
   // The grammar's art branch cannot forbid medium "photograph"; if the model
   // described a photograph through the art branch, fold art_style into photo.
   if (photo === null && medium !== null && medium.toLowerCase() === "photograph") {
-    photo = artStyle;
+    photo = artStyle || "natural";
     artStyle = null;
   }
 
@@ -86,7 +85,23 @@ function normalizeStyle(style) {
     if (palette !== null) out.color_palette = palette;
     return out;
   }
-  return null;
+
+  // Fallback: infer from medium if neither photo nor art_style is present
+  if (medium !== null) {
+    if (medium.toLowerCase() === "photograph") {
+      const out = { aesthetics, lighting, photo: "natural", medium: "photograph" };
+      if (palette !== null) out.color_palette = palette;
+      return out;
+    }
+    const out = { aesthetics, lighting, medium, art_style: "detailed" };
+    if (palette !== null) out.color_palette = palette;
+    return out;
+  }
+
+  // Last resort: default to photograph
+  const out = { aesthetics, lighting, photo: "natural", medium: "photograph" };
+  if (palette !== null) out.color_palette = palette;
+  return out;
 }
 
 // Key order: obj  -> type, bbox, desc, color_palette
