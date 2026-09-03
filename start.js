@@ -22,6 +22,12 @@ module.exports = {
       params: {
         url: "{{input.event[1]}}"
       }
+    },
+    {
+      method: "system.open",
+      params: {
+        url: "{{input.event[1]}}"
+      }
     }
   ]
 }
