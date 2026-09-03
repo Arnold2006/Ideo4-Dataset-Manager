@@ -12,7 +12,7 @@ module.exports = {
           "node server.mjs"
         ],
         on: [{
-          event: "/(http:\\/\\/127\\.0\\.0\\.1:[0-9]+|http:\\/\\/localhost:[0-9]+)/",
+          event: "/http:\\/\\/[\\w.]+:[0-9]+/",
           done: true
         }]
       }
@@ -20,13 +20,7 @@ module.exports = {
     {
       method: "local.set",
       params: {
-        url: "{{input.event[1]}}"
-      }
-    },
-    {
-      method: "system.open",
-      params: {
-        url: "{{input.event[1]}}"
+        url: "{{input.event[0]}}"
       }
     }
   ]
