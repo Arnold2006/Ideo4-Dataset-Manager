@@ -498,6 +498,7 @@ function fillForm(data){
   renderGlobalPalette(sd.color_palette||[]);
   document.getElementById('f-bg').value=cd.background||'';
   renderElements(cd.elements||[]);
+  ['f-hld','f-aesthetics','f-lighting','f-bg'].forEach(id=>{const ta=document.getElementById(id);if(ta&&ta.value)autoExpandTextarea(ta)});
   document.getElementById('unsaved-dot').style.display='none';
 }
 
@@ -521,6 +522,7 @@ function renderElements(elements){
   document.getElementById('el-count-badge').textContent=elements.length;
   if(!elements.length){container.innerHTML='<div style="font-size:13px;color:var(--color-text-secondary);padding:0 0 10px;text-align:center">No elements yet</div>';return}
   container.innerHTML=elements.map((el,i)=>elementHtml(el,i)).join('');
+  container.querySelectorAll('.el-desc').forEach(ta=>{if(ta.value)autoExpandTextarea(ta)});
 }
 
 function elementHtml(el,i){
