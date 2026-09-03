@@ -852,8 +852,8 @@ function updateDrawUI(){
     if(drawMode){
       h.style.display='block';
       h.textContent=drawMode==='obj'
-        ?'Drawing OBJECT box — drag on the image to create it. Draw as many as you like; click the button again or press Esc to stop.'
-        :'Drawing TEXT box — drag on the image to create it. Draw as many as you like; click the button again or press Esc to stop.';
+        ?'Drawing OBJECT box — drag on the image to create it. Release to finish; click the button again or press Esc to cancel.'
+        :'Drawing TEXT box — drag on the image to create it. Release to finish; click the button again or press Esc to cancel.';
     }
     else h.style.display='none';
   }
@@ -861,7 +861,10 @@ function updateDrawUI(){
 
 function finishDrawBox(){
   const box=drawPreview;
+  const type=drawMode||'obj';
   drawState=null; drawPreview=null;
+  drawMode=null;
+  updateDrawUI();
   const d=dataset[current];
   if(!d||!box){drawBboxes();return}
   const[ymin,xmin,ymax,xmax]=box;
@@ -869,7 +872,7 @@ function finishDrawBox(){
   if(!d.data.compositional_deconstruction)d.data.compositional_deconstruction={background:'',elements:[]};
   if(!d.data.compositional_deconstruction.elements)d.data.compositional_deconstruction.elements=[];
   const els=d.data.compositional_deconstruction.elements;
-  els.push({type:drawMode||'obj',desc:'',bbox:[ymin,xmin,ymax,xmax]});
+  els.push({type,desc:'',bbox:[ymin,xmin,ymax,xmax]});
   const newIdx=els.length-1;
   modified.add(current);
   document.getElementById('unsaved-dot').style.display='inline-block';
