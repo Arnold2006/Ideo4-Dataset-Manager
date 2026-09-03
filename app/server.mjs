@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { GENERATION_SCHEMA } from './src/generation-schema.mjs'
 import { normalizeCaption, serializeCaption } from './src/normalize.mjs'
 import { validateCaption } from './src/validate.mjs'
-import { SYSTEM_PROMPT, FEW_SHOT } from './src/prompt.mjs'
+import { SYSTEM_PROMPT } from './src/prompt.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -108,11 +108,6 @@ function buildMessages(imageBase64, instructions, lastErrors) {
     : SYSTEM_PROMPT
   const styleNote = '\n\nYou MUST always include the "style_description" object in your output. It is required, never optional. Choose either the photograph variant (with fields: aesthetics, lighting, photo, medium="photograph", color_palette) or the art variant (with fields: aesthetics, lighting, medium, art_style, color_palette). Always populate all fields with rich, specific values. Never omit style_description.'
   const messages = [{ role: 'system', content: sysPrompt + styleNote }]
-
-  for (const [user, response] of FEW_SHOT) {
-    messages.push({ role: 'user', content: user })
-    messages.push({ role: 'assistant', content: response })
-  }
 
   const errorSuffix = lastErrors.length > 0
     ? '\n\n(Your previous answer had these problems, fix them: ' + lastErrors.join('; ') + ')'
