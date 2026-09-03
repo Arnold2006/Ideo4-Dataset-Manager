@@ -7,9 +7,10 @@ The JSON has exactly three top-level fields, in this order:
 3. "compositional_deconstruction": the spatial layout.
 
 style_description rules:
-- For photographs use keys in this order: aesthetics, lighting, photo, medium, color_palette. "photo" holds camera/lens details (e.g. "35mm, f/1.4, shallow depth of field, eye-level"). "medium" must be exactly "photograph".
-- For everything else use keys in this order: aesthetics, lighting, medium, art_style, color_palette. "medium" is the broad type (e.g. "illustration", "3d_render", "painting", "graphic_design", "pixel_art", "watercolor"); it must NOT be "photograph". "art_style" describes the style in detail (e.g. "flat vector illustration, bold outlines, geometric shapes").
-- "aesthetics" is comma-separated aesthetic keywords. "lighting" describes the light.
+- ALWAYS include ALL of these keys, in this order: aesthetics, lighting, medium, photo, art_style, color_palette. Every string field must hold a rich, specific value — never an empty string.
+- "medium" is "photograph" for photos, otherwise the broad type (e.g. "illustration", "3d_render", "painting", "graphic_design", "pixel_art", "watercolor"); it must NOT be "photograph" for non-photos.
+- "photo" holds camera/lens details (e.g. "35mm, f/1.4, shallow depth of field, eye-level"). "art_style" describes the non-photo style in detail (e.g. "flat vector illustration, bold outlines, geometric shapes"). Fill in BOTH fields meaningfully; the pipeline keeps the one matching "medium".
+- "aesthetics" is comma-separated aesthetic keywords. "lighting" describes the light in detail.
 - "color_palette" is an array of 4-8 uppercase hex colors like "#FF6B35" (7 characters each) capturing the dominant colors, including a highlight and a shadow tone.
 
 compositional_deconstruction rules:

@@ -106,7 +106,7 @@ function buildMessages(imageBase64, instructions, lastErrors) {
   const sysPrompt = (instructions || '').trim()
     ? SYSTEM_PROMPT + '\n\nAdditional style guidance:\n' + instructions.trim()
     : SYSTEM_PROMPT
-  const styleNote = '\n\nYou MUST always include the "style_description" object in your output. It is required, never optional. Choose either the photograph variant (with fields: aesthetics, lighting, photo, medium="photograph", color_palette) or the art variant (with fields: aesthetics, lighting, medium, art_style, color_palette). Always populate all fields with rich, specific values. Never omit style_description.'
+  const styleNote = '\n\nYou MUST always include the "style_description" object with ALL fields, in order: aesthetics, lighting, medium, photo, art_style, color_palette. Give every field a rich, specific value — never an empty string. "medium" is "photograph" for photos, otherwise the broad type (illustration, painting, 3d_render, …). Fill in BOTH "photo" (camera/lens details) and "art_style" (technique, texture); the pipeline keeps the one matching "medium".'
   const messages = [{ role: 'system', content: sysPrompt + styleNote }]
 
   const errorSuffix = lastErrors.length > 0
@@ -198,7 +198,7 @@ async function generateCaption(llamaUrl, imageBase64, instructions) {
       prompt_compact: serializeCaption(normalized.value),
       valid: true,
       attempts: attempt,
-      version: 'DEBUG_20260903_v2'
+      version: 'DEBUG_20260903_v3'
     }
   }
 

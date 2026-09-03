@@ -333,7 +333,7 @@ textarea:focus,input[type=text]:focus{
 </div>
 
 <script>
-console.log('[PAGE LOAD] Ideo4 Dataset Manager loaded. Version check: DEBUG_MODE_20260903');
+console.log('[PAGE LOAD] Ideo4 Dataset Manager loaded. Version check: DEBUG_MODE_20260903_v3');
 let dataset=[], current=0, dirHandle=null, modified=new Set(), photoArtMode={};
 let selectedIdx=null, dragState=null, hitAreas={handles:{},delBtn:null,boxes:[]};
 let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false;
@@ -804,8 +804,8 @@ function getFormData(){
   if(pa){sd[mode==='photo'?'photo':'art_style']=pa}
   const gpal=Array.from(document.querySelectorAll('#global-chips .chip')).map(c=>{
     const sw=c.querySelector('.chip-sw');
-    return sw?sw.style.backgroundColor||sw.style.background||'':'';
-  }).filter(c=>c).map(c=>c.replace(/^rgb\(.*?\)$/,'').replace(/\s+/g,''));
+    return toHexColor(sw?sw.style.backgroundColor||sw.style.background||'':'');
+  }).filter(c=>c);
   if(gpal.length)sd.color_palette=gpal;
 
   const elements=Array.from(document.querySelectorAll('.el-card')).map(card=>{
@@ -816,8 +816,8 @@ function getFormData(){
     const bbox=['ymin','xmin','ymax','xmax'].map(k=>parseInt(card.querySelector('.bbox-'+k)?.value)||0);
     if(bbox.some(v=>v>0))el.bbox=bbox;
     const epal=Array.from(card.querySelectorAll('.chip .chip-sw')).map(c=>{
-      return c.style.backgroundColor||c.style.background||'';
-    }).filter(c=>c).map(c=>c.replace(/^rgb\(.*?\)$/,'').replace(/\s+/g,''));
+      return toHexColor(c.style.backgroundColor||c.style.background||'');
+    }).filter(c=>c);
     if(epal.length)el.color_palette=epal;
     return el;
   });
@@ -830,6 +830,15 @@ function getFormData(){
 }
 
 function v(id){return document.getElementById(id)?.value.trim()||''}
+function toHexColor(c){
+  c=String(c||'').trim();
+  let m=c.match(/^#([0-9a-fA-F]{3})$/);
+  if(m){const t=m[1];return ('#'+t[0]+t[0]+t[1]+t[1]+t[2]+t[2]).toUpperCase()}
+  if(/^#[0-9a-fA-F]{6}$/.test(c))return c.toUpperCase();
+  m=c.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/);
+  if(m){const h=n=>Math.max(0,Math.min(255,parseInt(n,10))).toString(16).padStart(2,'0').toUpperCase();return '#'+h(m[1])+h(m[2])+h(m[3])}
+  return '';
+}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
 function onFormChange(){
@@ -949,7 +958,7 @@ async function saveAll(){
   for(let i=0;i<dataset.length;i++){
     const d=dataset[i];
     if(!d.jsonName)d.jsonName=d.base+'.json';
-    d.data=getFormData();
+    if(i===current)d.data=getFormData();
     const json=JSON.stringify(d.data,null,2);
     let wrote=false;
     if(d.jsonHandle){

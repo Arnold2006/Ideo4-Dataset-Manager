@@ -9,10 +9,18 @@
 // grammar enforcer treats all fields as mandatory — the model can no longer
 // silently skip style_description or any other top-level field.
 //
-// Grammar-level guarantees: structure, key order, types, oneOf branching,
-// array lengths, string min lengths, required fields.
+// Grammar-level guarantees: structure, key order, types, array lengths,
+// string min lengths, required fields.
 // NOT expressible at grammar level: regex patterns (hex colors), integer
 // ranges (bbox 0-1000). Those are handled by normalize.mjs / validate.mjs.
+//
+// style_description is deliberately a SINGLE flat object (not oneOf photo /
+// art branches): llama.cpp's grammar converter cannot reliably enforce
+// oneOf + const + not, and the model then silently dropped lighting, medium
+// and photo/art_style. The grammar therefore forces ALL style fields to be
+// generated; normalize.mjs deterministically keeps the variant matching
+// `medium` (photo details for "photograph", art_style otherwise) and drops
+// the other key, producing the official variant form.
 
 // "#RRGGBB" is exactly 7 chars; exact charset enforced post-generation.
 const HEX_COLOR = { type: "string", minLength: 7, maxLength: 7 };
@@ -40,42 +48,23 @@ export const GENERATION_SCHEMA = {
     high_level_description: { type: "string", minLength: 1 },
 
     style_description: {
-      oneOf: [
-        {
-          // Photograph variant
-          type: "object",
-          required: ["aesthetics", "lighting", "photo", "medium", "color_palette"],
-          properties: {
-            aesthetics: { type: "string", minLength: 1 },
-            lighting:   { type: "string", minLength: 1 },
-            photo:      { type: "string", minLength: 1 },
-            medium:     { const: "photograph" },
-            color_palette: {
-              type: "array",
-              items: HEX_COLOR,
-              minItems: 1,
-              maxItems: 16
-            }
-          }
-        },
-        {
-          // Art variant (illustration, 3d_render, painting, graphic_design, …)
-          type: "object",
-          required: ["aesthetics", "lighting", "medium", "art_style", "color_palette"],
-          properties: {
-            aesthetics: { type: "string", minLength: 1 },
-            lighting:   { type: "string", minLength: 1 },
-            medium:     { type: "string", minLength: 1 },
-            art_style:  { type: "string", minLength: 1 },
-            color_palette: {
-              type: "array",
-              items: HEX_COLOR,
-              minItems: 1,
-              maxItems: 16
-            }
-          }
+      // Flat object: every field always generated, in this exact key order.
+      // normalize.mjs reduces this to the official photo/art variant.
+      type: "object",
+      required: ["aesthetics", "lighting", "medium", "photo", "art_style", "color_palette"],
+      properties: {
+        aesthetics: { type: "string", minLength: 1 },
+        lighting:   { type: "string", minLength: 1 },
+        medium:     { type: "string", minLength: 1 },
+        photo:      { type: "string", minLength: 1 },
+        art_style:  { type: "string", minLength: 1 },
+        color_palette: {
+          type: "array",
+          items: HEX_COLOR,
+          minItems: 1,
+          maxItems: 16
         }
-      ]
+      }
     },
 
     compositional_deconstruction: {

@@ -56,52 +56,51 @@ function normalizeBbox(value) {
 
 // Key order: photo -> aesthetics, lighting, photo, medium, color_palette
 //            art   -> aesthetics, lighting, medium, art_style, color_palette
+//
+// The generation grammar always emits ALL of aesthetics, lighting, medium,
+// photo and art_style (flat object, no branching). The official schema wants
+// exactly one variant, so the field matching `medium` is kept and the other
+// is dropped. Missing/empty style content is NOT papered over with
+// placeholders — { ok: false, reason } is returned so the caller retries
+// with the reason fed back to the model. color_palette stays optional:
+// a missing/invalid palette is dropped, never a reason to reject.
 function normalizeStyle(style) {
   if (typeof style !== "object" || style === null || Array.isArray(style)) {
-    return null;
+    return { ok: false, reason: "style_description is missing; include the style_description object with aesthetics, lighting, medium, photo, art_style and color_palette" };
   }
-  const aesthetics = nonEmptyString(style.aesthetics) || "natural, clean";
-  const lighting = nonEmptyString(style.lighting) || "soft, even";
-
-  let photo = nonEmptyString(style.photo);
-  let medium = nonEmptyString(style.medium);
-  let artStyle = nonEmptyString(style.art_style);
+  const aesthetics = nonEmptyString(style.aesthetics);
+  if (aesthetics === null) {
+    return { ok: false, reason: "style_description.aesthetics is empty; describe the aesthetics with comma-separated keywords" };
+  }
+  const lighting = nonEmptyString(style.lighting);
+  if (lighting === null) {
+    return { ok: false, reason: "style_description.lighting is empty; describe the light in the image in detail" };
+  }
+  const medium = nonEmptyString(style.medium);
+  if (medium === null) {
+    return { ok: false, reason: "style_description.medium is empty; set it to \"photograph\" for photos or the broad type (e.g. illustration, painting, 3d_render) otherwise" };
+  }
+  const photo = nonEmptyString(style.photo);
+  const artStyle = nonEmptyString(style.art_style);
   const palette = normalizePalette(style.color_palette, LIMITS.stylePaletteMax);
 
-  // The grammar's art branch cannot forbid medium "photograph"; if the model
-  // described a photograph through the art branch, fold art_style into photo.
-  if (photo === null && medium !== null && medium.toLowerCase() === "photograph") {
-    photo = artStyle || "natural";
-    artStyle = null;
-  }
-
-  if (photo !== null) {
-    const out = { aesthetics, lighting, photo, medium: "photograph" };
-    if (palette !== null) out.color_palette = palette;
-    return out;
-  }
-  if (artStyle !== null && medium !== null) {
-    const out = { aesthetics, lighting, medium, art_style: artStyle };
-    if (palette !== null) out.color_palette = palette;
-    return out;
-  }
-
-  // Fallback: infer from medium if neither photo nor art_style is present
-  if (medium !== null) {
-    if (medium.toLowerCase() === "photograph") {
-      const out = { aesthetics, lighting, photo: "natural", medium: "photograph" };
-      if (palette !== null) out.color_palette = palette;
-      return out;
+  if (medium.toLowerCase() === "photograph") {
+    // Tolerate the model describing the photo through the art field.
+    const photoText = photo || artStyle;
+    if (photoText === null) {
+      return { ok: false, reason: "style_description.photo is empty; describe the camera/lens details (e.g. 35mm, f/1.4, shallow depth of field, eye-level)" };
     }
-    const out = { aesthetics, lighting, medium, art_style: "detailed" };
+    const out = { aesthetics, lighting, photo: photoText, medium: "photograph" };
     if (palette !== null) out.color_palette = palette;
-    return out;
+    return { ok: true, style: out };
   }
 
-  // Last resort: default to photograph
-  const out = { aesthetics, lighting, photo: "natural", medium: "photograph" };
+  if (artStyle === null) {
+    return { ok: false, reason: `style_description.art_style is empty; describe the ${medium} style in detail (technique, outlines, texture)` };
+  }
+  const out = { aesthetics, lighting, medium, art_style: artStyle };
   if (palette !== null) out.color_palette = palette;
-  return out;
+  return { ok: true, style: out };
 }
 
 // Key order: obj  -> type, bbox, desc, color_palette
@@ -149,10 +148,11 @@ export function normalizeCaption(raw) {
 
   // Top-level key order: high_level_description, style_description,
   // compositional_deconstruction.
-  const style = normalizeStyle(raw.style_description);
-  if (style === null) {
-    return { ok: false, reason: "style_description is missing or invalid" };
+  const styled = normalizeStyle(raw.style_description);
+  if (!styled.ok) {
+    return { ok: false, reason: styled.reason };
   }
+  const style = styled.style;
   const out = {};
   if (highLevel !== null) out.high_level_description = highLevel;
   out.style_description = style;
