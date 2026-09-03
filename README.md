@@ -1,4 +1,4 @@
-# Ideogram 4 Dataset Editor
+# Ideo4 Dataset Manager
 
 A local, single-window editor for building **Ideogram 4** fine-tuning datasets, with **AI image
 captioning** (single image or whole batch) powered by a local **llama.cpp** vision model.

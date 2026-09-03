@@ -1,7 +1,7 @@
 const path = require('path')
 module.exports = {
   version: "7.0",
-  title: "Ideogram 4 Dataset Editor",
+  title: "Ideo4 Dataset Manager",
   description: "Edit Ideogram 4 fine-tuning datasets with AI image captioning (single image or whole batch) powered by a local llama.cpp vision model.",
   icon: "icon.png",
   menu: async (kernel) => {
