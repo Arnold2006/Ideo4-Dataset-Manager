@@ -21,7 +21,7 @@ module.exports = {
       method: "hf.download",
       params: {
         path: "app",
-        "_": ["noctrex/Huihui-Qwen3-VL-4B-Instruct-abliterated-GGUF", "Huihui-Qwen3-VL-4B-Instruct-abliterated-Q4_K_M.gguf"],
+        "_": ["concedo/llama-joycaption-beta-one-hf-llava-mmproj-gguf", "Llama-Joycaption-Beta-One-Hf-Llava-Q4_K.gguf"],
         "local-dir": "models"
       }
     },
@@ -29,7 +29,7 @@ module.exports = {
       method: "hf.download",
       params: {
         path: "app",
-        "_": ["noctrex/Huihui-Qwen3-VL-4B-Instruct-abliterated-GGUF", "mmproj-F16.gguf"],
+        "_": ["concedo/llama-joycaption-beta-one-hf-llava-mmproj-gguf", "llama-joycaption-beta-one-llava-mmproj-model-f16.gguf"],
         "local-dir": "models"
       }
     },

@@ -37,7 +37,7 @@ returns into the dataset schema, and tears the subprocess down.
 
 ## Install & run (Pinokio)
 
-1. **Install** — downloads prebuilt llama.cpp binaries and the Qwen3-VL-4B vision model + mmproj.
+1. **Install** — downloads prebuilt llama.cpp binaries and the JoyCaption LLaVA vision model + mmproj.
 2. **Start** — launches the editor on a free port and writes `server-info.json`.
 3. **Open Editor** — opens the web UI in your browser.
 
@@ -135,6 +135,6 @@ console.log((await r.json()).data);
 
 The llama.cpp binary is expected in `bin/` (downloaded by `install.js` via `download-llama.mjs`).
 
-The default model is `Huihui-Qwen3-VL-4B-Instruct-abliterated-Q4_K_M.gguf` with `mmproj-F16.gguf`
+The default model is `Llama-Joycaption-Beta-One-Hf-Llava-Q4_K.gguf` with `llama-joycaption-beta-one-llava-mmproj-model-f16.gguf`
 (downloaded from Hugging Face). Place any other GGUF vision model + matching mmproj in `app/models/`
 and the server will auto-discover it.

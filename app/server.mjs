@@ -51,10 +51,10 @@ function resolveModels() {
   }
   const files = fs.readdirSync(MODELS_DIR)
   const modelFile = files
-    .filter(f => f.toLowerCase().endsWith('.gguf') && !f.toLowerCase().startsWith('mmproj'))
+    .filter(f => f.toLowerCase().endsWith('.gguf') && !f.toLowerCase().includes('mmproj'))
     .sort()[0]
   if (!modelFile) throw new Error('No model .gguf found in app/models/')
-  const mmprojFile = files.find(f => f.toLowerCase().startsWith('mmproj') && f.toLowerCase().endsWith('.gguf'))
+  const mmprojFile = files.find(f => f.toLowerCase().includes('mmproj') && f.toLowerCase().endsWith('.gguf'))
   return { modelFile: path.join(MODELS_DIR, modelFile), mmprojFile: mmprojFile ? path.join(MODELS_DIR, mmprojFile) : null }
 }
 
