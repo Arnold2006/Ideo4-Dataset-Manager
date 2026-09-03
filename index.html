@@ -333,6 +333,7 @@ textarea:focus,input[type=text]:focus{
 </div>
 
 <script>
+console.log('[PAGE LOAD] Ideo4 Dataset Manager loaded. Version check: DEBUG_MODE_20260903');
 let dataset=[], current=0, dirHandle=null, modified=new Set(), photoArtMode={};
 let selectedIdx=null, dragState=null, hitAreas={handles:{},delBtn:null,boxes:[]};
 let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false;
