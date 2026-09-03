@@ -125,6 +125,8 @@ textarea:focus,input[type=text]:focus{outline:none;border-color:var(--color-bord
 .add-el-row{display:flex;gap:8px;margin-top:4px}
 .add-el-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:0.5px dashed var(--color-border-secondary);background:none;border-radius:var(--border-radius-md);padding:8px;cursor:pointer;font-size:13px;color:var(--color-text-secondary)}
 .add-el-btn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.add-el-btn.active{border-color:#1D9E75;color:#0F6E56;background:#E1F5EE;border-style:solid}
+#draw-hint{display:none;font-size:12px;color:#0F6E56;background:#E1F5EE;border:0.5px solid #1D9E75;border-radius:var(--border-radius-md);padding:6px 9px;margin-top:6px;line-height:1.5}
 
 .photo-art-toggle{display:flex;gap:0;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden;margin-bottom:8px}
 .pat-btn{flex:1;padding:6px 8px;font-size:12px;background:none;border:none;cursor:pointer;color:var(--color-text-secondary)}
@@ -324,6 +326,11 @@ textarea:focus,input[type=text]:focus{
               <button class="add-el-btn" onclick="addElement('obj')"><i class="ti ti-circle-plus"></i> Add object</button>
               <button class="add-el-btn" onclick="addElement('text')"><i class="ti ti-text-size"></i> Add text</button>
             </div>
+            <div class="add-el-row">
+              <button class="add-el-btn" id="draw-obj-btn" onclick="setDrawMode('obj')"><i class="ti ti-box"></i> Draw object</button>
+              <button class="add-el-btn" id="draw-text-btn" onclick="setDrawMode('text')"><i class="ti ti-text-size"></i> Draw text</button>
+            </div>
+            <div id="draw-hint"></div>
           </div>
         </div>
 
@@ -333,9 +340,9 @@ textarea:focus,input[type=text]:focus{
 </div>
 
 <script>
-console.log('[PAGE LOAD] Ideo4 Dataset Manager loaded. Version check: DEBUG_MODE_20260903_v3');
+console.log('[PAGE LOAD] Ideo4 Dataset Manager loaded. Version check: DEBUG_MODE_20260903_v4');
 let dataset=[], current=0, dirHandle=null, modified=new Set(), photoArtMode={};
-let selectedIdx=null, dragState=null, hitAreas={handles:{},delBtn:null,boxes:[]};
+let selectedIdx=null, dragState=null, drawMode=null, drawState=null, drawPreview=null, hitAreas={handles:{},delBtn:null,boxes:[]};
 let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false;
 
 async function openFolder(){
@@ -469,6 +476,7 @@ async function goTo(i){
 
 function renderEntry(){
   const d=dataset[current];
+  drawState=null; drawPreview=null;
   const img=document.getElementById('img-wrap');
   const existing=img.querySelector('img');
   if(existing)img.removeChild(existing);
@@ -685,6 +693,20 @@ function drawBboxes(highlighted=selectedIdx){
       });
     }
   });
+  if(drawPreview){
+    const{x,y,w,h}=boxToScreen(drawPreview,m);
+    ctx.save();
+    ctx.strokeStyle=drawMode==='text'?'#185FA5':'#0F6E56';
+    ctx.lineWidth=1.5;
+    ctx.setLineDash([6,4]);
+    ctx.strokeRect(x,y,w,h);
+    ctx.setLineDash([]);
+    ctx.fillStyle=ctx.strokeStyle;
+    ctx.font='bold 11px sans-serif';
+    const bw=Math.round(w/m.iw*1000), bh=Math.round(h/m.ih*1000);
+    ctx.fillText(`${bw}×${bh}`,x+3,(y-5<0)?y+13:y-5);
+    ctx.restore();
+  }
 }
 
 function canvasPoint(e){
@@ -698,6 +720,16 @@ function onCanvasMouseDown(e){
   if(!dataset.length)return;
   const m=imgMetrics();if(!m)return;
   const p=canvasPoint(e);
+  if(drawMode){
+    e.preventDefault();
+    const{bx,by}=screenToBboxPt(p.x,p.y,m);
+    drawState={startBx:bx,startBy:by};
+    drawPreview=null;
+    document.body.style.userSelect='none';
+    document.addEventListener('mousemove',onCanvasMouseMove);
+    document.addEventListener('mouseup',onCanvasMouseUp);
+    return;
+  }
   if(hitAreas.delBtn&&pointInRect(p,hitAreas.delBtn)){
     e.preventDefault();
     removeElement(hitAreas.delBtn.idx);
@@ -735,9 +767,19 @@ function onCanvasMouseDown(e){
 function onCanvasMouseMove(e){
   const m=imgMetrics();if(!m)return;
   const canvas=document.getElementById('bbox-canvas');
+  if(drawState){
+    const p=canvasPoint(e);
+    const{bx,by}=screenToBboxPt(p.x,p.y,m);
+    const clamp=(v)=>Math.max(0,Math.min(1000,v));
+    const x0=clamp(drawState.startBx), y0=clamp(drawState.startBy);
+    const x1=clamp(bx), y1=clamp(by);
+    drawPreview=[Math.round(Math.min(y0,y1)),Math.round(Math.min(x0,x1)),Math.round(Math.max(y0,y1)),Math.round(Math.max(x0,x1))];
+    drawBboxes();
+    return;
+  }
   if(!dragState){
     const p=canvasPoint(e);
-    let cursor='default';
+    let cursor=drawMode?'crosshair':'default';
     if(hitAreas.delBtn&&pointInRect(p,hitAreas.delBtn))cursor='pointer';
     else if(['nw','se'].some(k=>hitAreas.handles[k]&&pointInRect(p,hitAreas.handles[k])))cursor='nwse-resize';
     else if(['ne','sw'].some(k=>hitAreas.handles[k]&&pointInRect(p,hitAreas.handles[k])))cursor='nesw-resize';
@@ -779,10 +821,63 @@ function onCanvasMouseUp(){
   document.removeEventListener('mousemove',onCanvasMouseMove);
   document.removeEventListener('mouseup',onCanvasMouseUp);
   document.body.style.userSelect='';
+  if(drawState){finishDrawBox();return}
   if(dragState){
     onElChange(dragState.idx);
     dragState=null;
   }
+}
+
+function setDrawMode(type){
+  if(!dataset.length)return;
+  drawMode=(drawMode===type)?null:type;
+  drawState=null; drawPreview=null;
+  updateDrawUI();
+  drawBboxes();
+}
+
+function cancelDrawMode(){
+  drawMode=null; drawState=null; drawPreview=null;
+  updateDrawUI();
+  drawBboxes();
+}
+
+function updateDrawUI(){
+  const o=document.getElementById('draw-obj-btn'), t=document.getElementById('draw-text-btn'), h=document.getElementById('draw-hint');
+  if(o)o.classList.toggle('active',drawMode==='obj');
+  if(t)t.classList.toggle('active',drawMode==='text');
+  const canvas=document.getElementById('bbox-canvas');
+  if(canvas)canvas.style.cursor=drawMode?'crosshair':'default';
+  if(h){
+    if(drawMode){
+      h.style.display='block';
+      h.textContent=drawMode==='obj'
+        ?'Drawing OBJECT box — drag on the image to create it. Draw as many as you like; click the button again or press Esc to stop.'
+        :'Drawing TEXT box — drag on the image to create it. Draw as many as you like; click the button again or press Esc to stop.';
+    }
+    else h.style.display='none';
+  }
+}
+
+function finishDrawBox(){
+  const box=drawPreview;
+  drawState=null; drawPreview=null;
+  const d=dataset[current];
+  if(!d||!box){drawBboxes();return}
+  const[ymin,xmin,ymax,xmax]=box;
+  if(xmax-xmin<10||ymax-ymin<10){drawBboxes();return}
+  if(!d.data.compositional_deconstruction)d.data.compositional_deconstruction={background:'',elements:[]};
+  if(!d.data.compositional_deconstruction.elements)d.data.compositional_deconstruction.elements=[];
+  const els=d.data.compositional_deconstruction.elements;
+  els.push({type:drawMode||'obj',desc:'',bbox:[ymin,xmin,ymax,xmax]});
+  const newIdx=els.length-1;
+  modified.add(current);
+  document.getElementById('unsaved-dot').style.display='inline-block';
+  updateSidebar();
+  renderElements(els);
+  selectElement(newIdx);
+  const ta=document.querySelector('#elcard-'+newIdx+' .el-desc');
+  if(ta)ta.focus();
 }
 
 function syncBboxInputs(idx,bbox){
@@ -1081,7 +1176,7 @@ async function captionAll(){
 }
 
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){const ov=document.getElementById('steer-overlay');if(ov.classList.contains('open'))closeSteer();return}
+  if(e.key==='Escape'){const ov=document.getElementById('steer-overlay');if(ov.classList.contains('open'))closeSteer();else if(drawMode)cancelDrawMode();return}
   if(!dataset.length)return;
   const tag=document.activeElement.tagName;
   if(tag==='TEXTAREA'||tag==='INPUT')return;
@@ -1094,7 +1189,7 @@ document.addEventListener('keydown',e=>{
 (function initCanvasInteraction(){
   const canvas=document.getElementById('bbox-canvas');
   canvas.addEventListener('mousedown',onCanvasMouseDown);
-  canvas.addEventListener('mousemove',e=>{if(!dragState)onCanvasMouseMove(e)});
-  canvas.addEventListener('mouseleave',()=>{if(!dragState)canvas.style.cursor='default'});
+  canvas.addEventListener('mousemove',e=>{if(!dragState&&!drawState)onCanvasMouseMove(e)});
+  canvas.addEventListener('mouseleave',()=>{if(!dragState&&!drawState)canvas.style.cursor=drawMode?'crosshair':'default'});
 })();
 </script>
