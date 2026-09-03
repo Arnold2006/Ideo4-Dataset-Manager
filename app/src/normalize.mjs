@@ -134,10 +134,13 @@ export function normalizeCaption(raw) {
 
   // Top-level key order: high_level_description, style_description,
   // compositional_deconstruction.
+  const style = normalizeStyle(raw.style_description);
+  if (style === null) {
+    return { ok: false, reason: "style_description is missing or invalid" };
+  }
   const out = {};
   if (highLevel !== null) out.high_level_description = highLevel;
-  const style = normalizeStyle(raw.style_description);
-  if (style !== null) out.style_description = style;
+  out.style_description = style;
   out.compositional_deconstruction = { background, elements };
   return { ok: true, value: out };
 }
