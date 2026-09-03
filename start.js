@@ -22,6 +22,13 @@ module.exports = {
       params: {
         url: "{{input.event[0]}}"
       }
+    },
+    {
+      method: "browser.open",
+      params: {
+        uri: "{{local.url}}",
+        target: "_blank"
+      }
     }
   ]
 }
