@@ -352,7 +352,7 @@ textarea:focus,input[type=text]:focus{
 console.log('[PAGE LOAD] Ideo4 Dataset Manager loaded. Version check: DEBUG_MODE_20260903_v4');
 let dataset=[], current=0, dirHandle=null, modified=new Set(), photoArtMode={};
 let selectedIdx=null, dragState=null, drawMode=null, drawState=null, drawPreview=null, hitAreas={handles:{},delBtn:null,boxes:[]};
-let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false;
+let serverUrl=localStorage.getItem('ideo4_server_url')||'', aiBusy=false, batchHold=false;
 
 async function openFolder(){
   try{
@@ -515,10 +515,12 @@ function setAiStatus(kind,text){
 async function navigate(dir){
   const n=current+dir;
   if(n<0||n>=dataset.length)return;
+  if(aiBusy)batchHold=true;
   if(modified.has(current))await saveCurrentJson();
   current=n; renderEntry();
 }
 async function goTo(i){
+  if(aiBusy)batchHold=true;
   if(modified.has(current))await saveCurrentJson();
   current=i;renderEntry();
 }
@@ -1198,33 +1200,38 @@ async function captionAll(){
   if(!pending.length){setAiStatus('ok','All images already have captions.');return}
   if(!confirm(`Caption ${pending.length} uncaptioned image(s)?\n\nImages that already have a caption will be skipped. Continue?`))return;
   aiBusy=true;updateAiButtons();
+  batchHold=false;
   let ok=0,fail=0,skipped=0;
   const total=dataset.length;
   try{
     for(let i=0;i<total;i++){
       const d=dataset[i];
       if(hasCaption(d)){skipped++;continue}
-      setAiStatus('busy',`Captioning ${d.base}`);
+      setAiStatus('busy',`Captioning ${i+1}/${total} · ${d.base}…`);
+      console.log(`[captionAll] ${i+1}/${total} captioning`,d.base);
       document.getElementById('progress-bar').style.width=((i)/total*100).toFixed(1)+'%';
       try{
         const file=await d.imgHandle.getFile();
         const b64=await fileToBase64(file);
         const data=await callCaption(b64,getSteering());
         await writeJsonFor(d,data);
+        modified.delete(i);
         if(i===current)renderEntry();
         ok++;
+        console.log(`[captionAll] ${i+1}/${total} done`,d.base);
         const dot=document.getElementById('sd-'+i);if(dot)dot.className='si-dot';
       }catch(e){
         fail++;
         d.captionFailed=true;
-        console.error('caption failed for',d.base,e);
+        console.error(`[captionAll] ${i+1}/${total} caption failed for`,d.base,e);
         const dot=document.getElementById('sd-'+i);if(dot)dot.className='si-dot failed';
       }
+      if(!batchHold){current=i;renderEntry();}
     }
     document.getElementById('progress-bar').style.width='100%';
     setAiStatus('ok',`Done — ${ok} captioned, ${skipped} skipped, ${fail} failed`);
     const si=document.getElementById('save-indicator');si.textContent='✓ '+ok+' saved';si.classList.add('show');setTimeout(()=>{si.classList.remove('show');si.textContent='✓ Saved'},3000);
-  }finally{aiBusy=false;updateAiButtons();}
+  }finally{aiBusy=false;batchHold=false;updateAiButtons();}
 }
 
 document.addEventListener('keydown',e=>{
