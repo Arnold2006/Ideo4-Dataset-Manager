@@ -132,6 +132,40 @@ function buildMessages(imageBase64, instructions, lastErrors) {
   return messages
 }
 
+function extractHldPrefix(instructions) {
+  const s = (instructions || '').trim()
+  if (!s) return null
+  const patterns = [
+    /add\s+the\s+word\s+["'“”]([^"'“”]+)["'“”]\s+as\s+(?:a\s+)?prefix\s+(?:to\s+)?high_level_description/i,
+    /prefix\s+high_level_description\s+with\s+(?:the\s+word\s+)?["'“”]([^"'“”]+)["'“”]/i,
+    /prefix\s+["'“”]([^"'“”]+)["'“”]\s+to\s+high_level_description/i,
+  ]
+  for (const re of patterns) {
+    const m = s.match(re)
+    if (m && m[1].trim()) return m[1]
+  }
+  return null
+}
+
+// Deterministic enforcement: small local models under a strict JSON grammar
+// routinely ignore abstract "prefix X" instructions in the prompt. Since the
+// prefix is mechanical, apply it here so it can never be silently dropped.
+function applySteeringPostProcess(caption, instructions) {
+  const prefix = extractHldPrefix(instructions)
+  if (!prefix) return { applied: false }
+  const cur = caption.high_level_description || ''
+  const normCur = cur.trimStart().toLowerCase()
+  const normPre = prefix.trim().toLowerCase()
+  const core = normPre.replace(/[\s.]+$/, '')
+  if (normCur.startsWith(normPre) || (core && normCur.startsWith(core + ' ') ) || (core && normCur === core)) {
+    return { applied: false, prefix, reason: 'already present' }
+  }
+  let p = prefix
+  if (!/\s$/.test(p)) p += ' '
+  caption.high_level_description = p + cur.trimStart()
+  return { applied: true, prefix }
+}
+
 async function callLlamaServer(llamaUrl, messages, temperature) {
   const res = await fetch(llamaUrl + '/v1/chat/completions', {
     method: 'POST',
@@ -193,12 +227,20 @@ async function generateCaption(llamaUrl, imageBase64, instructions) {
     const { valid, errors } = validateCaption(normalized.value)
     if (!valid) { lastErrors = errors; continue }
 
+    const steeringResult = applySteeringPostProcess(normalized.value, instructions)
+    if (steeringResult.applied) {
+      console.log('[caption] steering prefix enforced:', JSON.stringify(steeringResult.prefix))
+      const recheck = validateCaption(normalized.value)
+      if (!recheck.valid) { lastErrors = recheck.errors; continue }
+    }
+
     return {
       ok: true,
       data: normalized.value,
       prompt_compact: serializeCaption(normalized.value),
       valid: true,
       attempts: attempt,
+      steering_applied: steeringResult.applied || false,
       version: 'DEBUG_20260903_v3'
     }
   }
@@ -281,7 +323,7 @@ const server = http.createServer(async (req, res) => {
       try { proc.kill() } catch (_) {}
 
       if (result.ok) {
-        return send(res, 200, { ok: true, data: result.data, prompt_compact: result.prompt_compact, valid: true, attempts: result.attempts })
+        return send(res, 200, { ok: true, data: result.data, prompt_compact: result.prompt_compact, valid: true, attempts: result.attempts, steering_applied: result.steering_applied || false })
       }
       return send(res, 200, { ok: false, error: result.error, errors: result.errors })
     }
