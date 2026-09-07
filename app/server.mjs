@@ -103,8 +103,9 @@ function spawnLlama({ bin, port, model, mmproj }) {
 }
 
 function buildMessages(imageBase64, instructions, lastErrors) {
-  const sysPrompt = (instructions || '').trim()
-    ? SYSTEM_PROMPT + '\n\nAdditional style guidance:\n' + instructions.trim()
+  const steering = (instructions || '').trim()
+  const sysPrompt = steering
+    ? SYSTEM_PROMPT + '\n\nCRITICAL — User steering instructions (MUST follow exactly, takes precedence over defaults; applies to ALL fields, not just style):\n' + steering
     : SYSTEM_PROMPT
   const styleNote = '\n\nYou MUST always include the "style_description" object with ALL fields, in order: aesthetics, lighting, medium, photo, art_style, color_palette. Give every field a rich, specific value — never an empty string. "medium" is "photograph" for photos, otherwise the broad type (illustration, painting, 3d_render, …). Fill in BOTH "photo" (camera/lens details) and "art_style" (technique, texture); the pipeline keeps the one matching "medium".'
   const messages = [{ role: 'system', content: sysPrompt + styleNote }]
@@ -121,8 +122,8 @@ function buildMessages(imageBase64, instructions, lastErrors) {
     },
     {
       type: 'text',
-      text: (instructions
-        ? `Analyse this image and use it as the subject. Additional context from user: ${instructions}`
+      text: (steering
+        ? `Analyse this image and use it as the subject. You MUST obey these user instructions exactly: ${steering}`
         : 'Analyse this image carefully and generate a detailed Ideogram 4 JSON prompt for it.') + errorSuffix
     }
   ]
@@ -250,6 +251,7 @@ const server = http.createServer(async (req, res) => {
       }
       const { image_base64, instructions } = body
       if (!image_base64) return send(res, 400, { ok: false, error: 'missing image_base64' })
+      console.log('[caption] steering:', JSON.stringify((instructions || '').trim().slice(0, 300)))
 
       let modelPath, mmprojPath
       try {

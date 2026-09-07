@@ -47,6 +47,10 @@ body{font-family:var(--font-sans);font-size:14px;color:var(--color-text-primary)
 #steer-modal-body label{font-weight:500;color:var(--color-text-primary)}
 #steer-modal-body textarea{width:100%;font-size:13px;padding:8px 10px;resize:vertical;min-height:80px}
 #steer-modal-hint{font-size:11px;color:var(--color-text-tertiary)}
+#steer-modal-ftr{display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:0.5px solid var(--color-border-tertiary)}
+#steer-status{font-size:12px;color:var(--color-text-tertiary);margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}
+#steer-status.on{color:#8b5cf6}
+#btn-steer.active{background:#8b5cf6;color:#fff;border-color:#8b5cf6}
 
 #workspace{display:flex;flex:1;overflow:hidden}
 #sidebar{width:460px;border-right:0.5px solid var(--color-border-tertiary);overflow-y:auto;flex-shrink:0;display:none;background:var(--color-background-primary)}
@@ -222,8 +226,13 @@ textarea:focus,input[type=text]:focus{
           <li>Consistency: <em>"Always mention the person is a young woman with short dark hair"</em></li>
         </ul>
         <label>Steering instructions</label>
-        <textarea id="steer-input" rows="5" placeholder="e.g. Add the word &quot;Sarah&quot; as a prefix to high_level_description"></textarea>
-        <div id="steer-modal-hint">Leave empty for no steering. Applies to both single and batch captions.</div>
+        <textarea id="steer-input" rows="5" oninput="onSteerInput()" placeholder="e.g. Add the word &quot;Sarah&quot; as a prefix to high_level_description"></textarea>
+        <div id="steer-modal-hint">Leave empty for no steering. Applies to both single and batch captions. Saving happens automatically.</div>
+      </div>
+      <div id="steer-modal-ftr">
+        <span id="steer-status"></span>
+        <button class="tbar-btn" onclick="clearSteer()"><i class="ti ti-trash"></i> Clear</button>
+        <button class="tbar-btn primary" onclick="saveSteer()"><i class="ti ti-check"></i> Save</button>
       </div>
     </div>
   </div>
@@ -441,20 +450,60 @@ async function checkServer(){
   catch(e){markServer(false)}
 }
 
-let steerInitialized=false;
+const STEER_KEY='ideo4_steering';
+function loadSteering(){try{return (localStorage.getItem(STEER_KEY)||'').trim()}catch(e){return ''}}
+function persistSteering(val){try{localStorage.setItem(STEER_KEY,val)}catch(e){}}
 function openSteer(){
-  if(!steerInitialized){document.getElementById('steer-input').value='';steerInitialized=true}
+  document.getElementById('steer-input').value=loadSteering();
+  updateSteerStatus();
   document.getElementById('steer-overlay').classList.add('open');
-  document.getElementById('steer-input').focus();
+  setTimeout(()=>document.getElementById('steer-input').focus(),30);
 }
 
 function closeSteer(){
+  persistSteering(document.getElementById('steer-input').value.trim());
+  updateSteerButton();
   document.getElementById('steer-overlay').classList.remove('open');
+}
+
+function saveSteer(){
+  closeSteer();
+}
+
+function clearSteer(){
+  document.getElementById('steer-input').value='';
+  persistSteering('');
+  updateSteerStatus();
+  updateSteerButton();
+}
+
+function onSteerInput(){
+  persistSteering(document.getElementById('steer-input').value.trim());
+  updateSteerStatus();
+  updateSteerButton();
+}
+
+function updateSteerStatus(){
+  const v=document.getElementById('steer-input').value.trim();
+  const st=document.getElementById('steer-status');
+  if(st){st.textContent=v?('Active: '+ (v.length>60?v.slice(0,60)+'…':v)):'No steering (empty)';st.className=v?'on':'';st.id='steer-status'}
+}
+
+function updateSteerButton(){
+  const v=loadSteering();
+  const b=document.getElementById('btn-steer');
+  if(!b)return;
+  b.classList.toggle('active',!!v);
+  const base='<i class="ti ti-steering-wheel"></i> Steer captioning';
+  b.innerHTML=v?(base+' • on'):base;
+  b.title=v?('Steering active: '+v):'Set steering instructions for captioning';
 }
 
 function getSteering(){
   const el=document.getElementById('steer-input');
-  return el?el.value.trim():'';
+  const fromInput=el?el.value.trim():'';
+  if(fromInput)return fromInput;
+  return loadSteering();
 }
 
 function setAiStatus(kind,text){
@@ -1179,7 +1228,11 @@ async function captionAll(){
 }
 
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){const ov=document.getElementById('steer-overlay');if(ov.classList.contains('open'))closeSteer();else if(drawMode)cancelDrawMode();return}
+  const ov=document.getElementById('steer-overlay');
+  const steerOpen=ov&&ov.classList.contains('open');
+  if(e.key==='Escape'){if(steerOpen)closeSteer();else if(drawMode)cancelDrawMode();return}
+  if(steerOpen&&e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();saveSteer();return}
+  if(steerOpen)return;
   if(!dataset.length)return;
   const tag=document.activeElement.tagName;
   if(tag==='TEXTAREA'||tag==='INPUT')return;
@@ -1194,5 +1247,6 @@ document.addEventListener('keydown',e=>{
   canvas.addEventListener('mousedown',onCanvasMouseDown);
   canvas.addEventListener('mousemove',e=>{if(!dragState&&!drawState)onCanvasMouseMove(e)});
   canvas.addEventListener('mouseleave',()=>{if(!dragState&&!drawState)canvas.style.cursor=drawMode?'crosshair':'default'});
+  updateSteerButton();
 })();
 </script>
