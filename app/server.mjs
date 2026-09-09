@@ -179,6 +179,90 @@ function applySteeringPostProcess(caption, instructions) {
   return { applied: true, prefix }
 }
 
+// Second-read guard against hallucinated on-image text: small VLMs often emit
+// "text" elements where no legible text exists. After a caption validates, ask
+// the (already loaded) model to transcribe all clearly legible text and drop
+// any text element it cannot confirm. Fail-open: if transcription fails, the
+// caption is kept as-is.
+const TEXT_VERIFY_SCHEMA = {
+  type: 'object',
+  required: ['texts'],
+  properties: { texts: { type: 'array', items: { type: 'string' } } },
+}
+
+function normTranscribed(s) {
+  return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function isTextConfirmed(elemText, transcribed) {
+  const e = normTranscribed(elemText)
+  if (!e) return false
+  return transcribed.some((t) => {
+    const n = normTranscribed(t)
+    if (!n) return false
+    if (n === e) return true
+    // Substring either way, but only for non-trivial strings so a single
+    // letter can't match everything.
+    if (Math.min(n.length, e.length) >= 3 && (n.includes(e) || e.includes(n))) return true
+    return false
+  })
+}
+
+async function verifyTextElements(llamaUrl, imageBase64, caption) {
+  const elements = caption?.compositional_deconstruction?.elements || []
+  if (!elements.some((el) => el.type === 'text' && el.text)) return { checked: false }
+  const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '')
+  const messages = [
+    { role: 'system', content: 'You transcribe text visible in images. Reply with ONLY JSON, nothing else.' },
+    {
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Data}` } },
+        { type: 'text', text: 'Transcribe every piece of clearly legible text visible in this image, each as a separate string. If no legible text is visible, return an empty array. Reply with ONLY JSON of the form {"texts": [...]}, nothing else.' },
+      ],
+    },
+  ]
+  let raw = null
+  try {
+    const res = await fetch(llamaUrl + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'local',
+        messages,
+        temperature: 0.2,
+        max_tokens: 512,
+        stream: false,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'text_transcription', schema: TEXT_VERIFY_SCHEMA, strict: true }
+        }
+      })
+    })
+    if (!res.ok) throw new Error(`llama-server error ${res.status}`)
+    const j = await res.json()
+    const content = j.choices?.[0]?.message?.content || ''
+    try { raw = JSON.parse(content) }
+    catch {
+      const s = content.indexOf('{'), e = content.lastIndexOf('}')
+      if (s >= 0 && e > s) raw = JSON.parse(content.slice(s, e + 1))
+    }
+  } catch (err) {
+    console.log('[caption] text verification skipped:', String(err?.message || err).slice(0, 200))
+    return { checked: false }
+  }
+  const transcribed = raw && Array.isArray(raw.texts) ? raw.texts.filter((t) => typeof t === 'string') : null
+  if (!transcribed) return { checked: false }
+  const before = elements.length
+  caption.compositional_deconstruction.elements = elements.filter((el) => {
+    if (el.type !== 'text' || !el.text) return true
+    const ok = isTextConfirmed(el.text, transcribed)
+    if (!ok) console.log('[caption] dropping unconfirmed text element:', JSON.stringify(el.text))
+    return ok
+  })
+  return { checked: true, dropped: before - caption.compositional_deconstruction.elements.length }
+}
+
 async function callLlamaServer(llamaUrl, messages, temperature, topP) {
   const res = await fetch(llamaUrl + '/v1/chat/completions', {
     method: 'POST',
@@ -246,8 +330,20 @@ async function generateCaption(llamaUrl, imageBase64, instructions) {
     const steeringResult = applySteeringPostProcess(normalized.value, instructions)
     if (steeringResult.applied) {
       console.log('[caption] steering prefix enforced:', JSON.stringify(steeringResult.prefix))
-      const recheck = validateCaption(normalized.value)
-      if (!recheck.valid) { lastErrors = recheck.errors; continue }
+    }
+
+    const verifyResult = await verifyTextElements(llamaUrl, imageBase64, normalized.value)
+    if (verifyResult.checked && verifyResult.dropped > 0) {
+      console.log(`[caption] text verification dropped ${verifyResult.dropped} unconfirmed text element(s)`)
+    }
+
+    // Final gate: re-validate after post-processing (prefixing + text drops).
+    // A caption left with zero elements fails here and is regenerated with
+    // feedback telling the model to stop inventing text.
+    const recheck = validateCaption(normalized.value)
+    if (!recheck.valid) {
+      lastErrors = [...recheck.errors, 'create "text" elements ONLY for clearly legible on-image text; describe blurry/unreadable signs as "obj" elements instead']
+      continue
     }
 
     return {
