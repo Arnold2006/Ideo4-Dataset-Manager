@@ -50,9 +50,19 @@ function resolveModels() {
     throw new Error('No models/ directory. Run the install script first.')
   }
   const files = fs.readdirSync(MODELS_DIR)
-  const modelFile = files
+  const quants = files
     .filter(f => f.toLowerCase().endsWith('.gguf') && !f.toLowerCase().includes('mmproj'))
-    .sort()[0]
+  // Prefer the highest-quality quant if several are present
+  // (Q8_0 > Q4_K > F16), otherwise fall back to sorted order.
+  const rank = (f) => {
+    const n = f.toLowerCase()
+    if (n.includes('q8_0')) return 0
+    if (n.includes('q4_k')) return 1
+    if (n.includes('f16')) return 2
+    return 3
+  }
+  quants.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+  const modelFile = quants[0]
   if (!modelFile) throw new Error('No model .gguf found in app/models/')
   const mmprojFile = files.find(f => f.toLowerCase().includes('mmproj') && f.toLowerCase().endsWith('.gguf'))
   return { modelFile: path.join(MODELS_DIR, modelFile), mmprojFile: mmprojFile ? path.join(MODELS_DIR, mmprojFile) : null }
@@ -122,9 +132,12 @@ function buildMessages(imageBase64, instructions, lastErrors) {
     },
     {
       type: 'text',
+      // JoyCaption-style descriptive lead (cf. Jay_Caption_Beta_one_Batch_WebUI
+      // default prompt "Write a long detailed description for this image."),
+      // blended with the JSON-only requirement our pipeline needs.
       text: (steering
-        ? `Analyse this image and use it as the subject. You MUST obey these user instructions exactly: ${steering}`
-        : 'Analyse this image carefully and generate a detailed Ideogram 4 JSON prompt for it.') + errorSuffix
+        ? `Write a long detailed description for this image. You MUST obey these user instructions exactly: ${steering} Respond with ONLY the Ideogram 4 JSON caption object for it — a single JSON object and nothing else.`
+        : 'Write a long detailed description for this image. Respond with ONLY the Ideogram 4 JSON caption object for it — a single JSON object and nothing else.') + errorSuffix
     }
   ]
 
@@ -166,7 +179,7 @@ function applySteeringPostProcess(caption, instructions) {
   return { applied: true, prefix }
 }
 
-async function callLlamaServer(llamaUrl, messages, temperature) {
+async function callLlamaServer(llamaUrl, messages, temperature, topP) {
   const res = await fetch(llamaUrl + '/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -174,6 +187,7 @@ async function callLlamaServer(llamaUrl, messages, temperature) {
       model: 'local',
       messages,
       temperature,
+      top_p: topP,
       max_tokens: 4096,
       stream: false,
       response_format: {
@@ -200,7 +214,9 @@ async function generateCaption(llamaUrl, imageBase64, instructions) {
 
     let text
     try {
-      text = await callLlamaServer(llamaUrl, messages, attempt === 1 ? 0.7 : 0.3)
+      // Sampling tuned to the reference JoyCaption WebUI
+      // (temperature 0.6, top_p 0.9; calmer retry on regeneration).
+      text = await callLlamaServer(llamaUrl, messages, attempt === 1 ? 0.6 : 0.3, 0.9)
     } catch (err) {
       return { ok: false, error: String(err?.message || err) }
     }
