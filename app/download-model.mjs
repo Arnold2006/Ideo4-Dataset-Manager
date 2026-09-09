@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const modelsDir = path.join(__dirname, 'models')
 // Huihui Qwen3-VL-8B-Instruct (abliterated/uncensored) GGUF + matching mmproj.
@@ -14,7 +16,9 @@ const STALE_FILES = [
   'Llama-Joycaption-Beta-One-Hf-Llava-Q4_K.gguf',
   'llama-joycaption-beta-one-llava-mmproj-model-f16.gguf',
 ]
-if (fs.existsSync(modelsDir)) {
+const REPO = 'noctrex/Huihui-Qwen3-VL-8B-Instruct-abliterated-GGUF'
+if (!fs.existsSync(modelsDir)) fs.mkdirSync(modelsDir, { recursive: true })
+{
   const present = fs.readdirSync(modelsDir)
   if (present.includes(MODEL_FILE) && present.includes(MMPROJ_FILE)) {
     console.log('model already present, skipping download')
@@ -28,8 +32,14 @@ if (fs.existsSync(modelsDir)) {
     }
   }
 }
-const { download } = await import('@huggingface/hub')
-const REPO = 'noctrex/Huihui-Qwen3-VL-8B-Instruct-abliterated-GGUF'
-await download(REPO, MODEL_FILE, { localDir: 'models' })
-await download(REPO, MMPROJ_FILE, { localDir: 'models' })
+const { downloadFile } = await import('@huggingface/hub')
+async function fetchFile(name, dest) {
+  console.log('downloading', name, '...')
+  const blob = await downloadFile({ repo: { type: 'model', name: REPO }, path: name })
+  if (!blob) throw new Error('file not found in repo ' + REPO + ': ' + name)
+  await pipeline(Readable.fromWeb(blob.stream()), fs.createWriteStream(dest))
+  console.log('saved', dest, `(${(fs.statSync(dest).size / 1024 ** 3).toFixed(2)} GB)`)
+}
+await fetchFile(MODEL_FILE, path.join(modelsDir, MODEL_FILE))
+await fetchFile(MMPROJ_FILE, path.join(modelsDir, MMPROJ_FILE))
 console.log('model download complete')
