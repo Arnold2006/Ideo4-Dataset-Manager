@@ -51,6 +51,9 @@ function normalizeBbox(value) {
   let [yMin, xMin, yMax, xMax] = nums;
   if (yMin > yMax) [yMin, yMax] = [yMax, yMin];
   if (xMin > xMax) [xMin, xMax] = [xMax, xMin];
+  // Zero-area boxes carry no placement information — reject so the element
+  // is kept without a (useless) box rather than with a misleading one.
+  if (yMin === yMax || xMin === xMax) return null;
   return [yMin, xMin, yMax, xMax];
 }
 
@@ -145,6 +148,17 @@ export function normalizeCaption(raw) {
   if (elements.length === 0) {
     return { ok: false, reason: "compositional_deconstruction.elements is empty" };
   }
+  // Exact-duplicate boxes for different elements are template repetition, not
+  // placement — keep the first, drop the rest. (The first element always
+  // survives, so this cannot empty a non-empty list.)
+  const seenBoxes = new Set();
+  const finalElements = elements.filter((e) => {
+    if (!Array.isArray(e.bbox)) return true;
+    const key = e.bbox.join(',');
+    if (seenBoxes.has(key)) return false;
+    seenBoxes.add(key);
+    return true;
+  });
 
   // Top-level key order: high_level_description, style_description,
   // compositional_deconstruction.
@@ -156,7 +170,7 @@ export function normalizeCaption(raw) {
   const out = {};
   if (highLevel !== null) out.high_level_description = highLevel;
   out.style_description = style;
-  out.compositional_deconstruction = { background, elements };
+  out.compositional_deconstruction = { background, elements: finalElements };
   return { ok: true, value: out };
 }
 

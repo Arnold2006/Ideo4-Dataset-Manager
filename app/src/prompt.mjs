@@ -16,7 +16,7 @@ style_description rules:
 compositional_deconstruction rules:
 - "background" describes the environment/setting behind the elements in one or two detailed sentences.
 - "elements" lists 2 to 6 distinct foreground objects and text blocks.
-- Every element has a "bbox" object: {"y_min": ..., "x_min": ..., "y_max": ..., "x_max": ...} in 0-1000 normalized coordinates, origin at the TOP-LEFT. y is VERTICAL: y=0 is the top edge, y=1000 the bottom edge. x is HORIZONTAL: x=0 is the left edge, x=1000 the right edge. y_min < y_max, x_min < x_max. Boxes must form a plausible, balanced layout and may overlap. Anchor boxes to compose from:
+- Every element has a "bbox" object: {"y_min": ..., "x_min": ..., "y_max": ..., "x_max": ...} in 0-1000 normalized coordinates, origin at the TOP-LEFT. y is VERTICAL: y=0 is the top edge, y=1000 the bottom edge. x is HORIZONTAL: x=0 is the left edge, x=1000 the right edge. y_min < y_max, x_min < x_max. Boxes must form a plausible, balanced layout and may overlap. Each box must tightly enclose ONLY its own element — a small object gets a small box, never a full-frame or template box. Every element gets its own distinct coordinates; never repeat the same box for different elements. Anchor boxes to compose from:
   - banner across the top: {"y_min":40,"x_min":100,"y_max":180,"x_max":900}
   - strip across the bottom: {"y_min":840,"x_min":100,"y_max":950,"x_max":900}
   - centered subject, full height: {"y_min":50,"x_min":300,"y_max":1000,"x_max":700}

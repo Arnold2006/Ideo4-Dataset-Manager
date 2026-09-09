@@ -112,7 +112,7 @@ function spawnLlama({ bin, port, model, mmproj }) {
   return proc
 }
 
-function buildMessages(imageBase64, instructions, lastErrors) {
+function buildMessages(imageBase64, instructions, lastErrors, dims) {
   const steering = (instructions || '').trim()
   const sysPrompt = steering
     ? SYSTEM_PROMPT + '\n\nCRITICAL — User steering instructions (MUST follow exactly, takes precedence over defaults; applies to ALL fields, not just style):\n' + steering
@@ -125,6 +125,20 @@ function buildMessages(imageBase64, instructions, lastErrors) {
     : ''
 
   const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '')
+  // True image dimensions: the vision encoder sees a square-resized input,
+  // so without this the model guesses coordinates blind on non-square images.
+  const aspectLine = (() => {
+    const w = Number(dims?.width), h = Number(dims?.height)
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return ''
+    const ratio = w / h
+    const orient = ratio > 1.05 ? 'landscape' : ratio < 0.95 ? 'portrait' : 'square'
+    return ` The original image is ${w} wide × ${h} tall (${orient}, aspect ratio ${ratio.toFixed(2)}). The vision input is square, so compensate for that distortion: coordinates are 0–1000 relative to the ORIGINAL image — x=1000 is its right edge however narrow, y=1000 its bottom however tall.`
+  })()
+  const forcedPrefix = extractHldPrefix(steering)
+  const exactPrefix = forcedPrefix ? (/\s$/.test(forcedPrefix) ? forcedPrefix : forcedPrefix + ' ') : null
+  const prefixRule = exactPrefix
+    ? ` The "high_level_description" MUST start with exactly "${exactPrefix}" (these exact characters, including punctuation). Do not use a colon or any other variation, and do not repeat the prefix.`
+    : ''
   const userContent = [
     {
       type: 'image_url',
@@ -136,8 +150,8 @@ function buildMessages(imageBase64, instructions, lastErrors) {
       // default prompt "Write a long detailed description for this image."),
       // blended with the JSON-only requirement our pipeline needs.
       text: (steering
-        ? `Write a long detailed description for this image. You MUST obey these user instructions exactly: ${steering} Respond with ONLY the Ideogram 4 JSON caption object for it — a single JSON object and nothing else.`
-        : 'Write a long detailed description for this image. Respond with ONLY the Ideogram 4 JSON caption object for it — a single JSON object and nothing else.') + errorSuffix
+        ? `Write a long detailed description for this image.${aspectLine} You MUST obey these user instructions exactly: ${steering}${prefixRule} Respond with ONLY the Ideogram 4 JSON caption object for it — a single JSON object and nothing else.`
+        : `Write a long detailed description for this image.${aspectLine} Respond with ONLY the Ideogram 4 JSON caption object for it — a single JSON object and nothing else.`) + errorSuffix
     }
   ]
 
@@ -163,19 +177,41 @@ function extractHldPrefix(instructions) {
 // Deterministic enforcement: small local models under a strict JSON grammar
 // routinely ignore abstract "prefix X" instructions in the prompt. Since the
 // prefix is mechanical, apply it here so it can never be silently dropped.
+// Detection is punctuation-tolerant (the model often writes "Word:" instead of
+// the requested "Word.") and collapses accidental repeats so a double prefix
+// like "TBMRobbie. TBMRobbie:" can never survive.
+function stripEdgePunct(s) {
+  return String(s || '').toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '')
+}
+
 function applySteeringPostProcess(caption, instructions) {
   const prefix = extractHldPrefix(instructions)
   if (!prefix) return { applied: false }
+  const want = /\s$/.test(prefix) ? prefix : prefix + ' '
+  const core = stripEdgePunct(prefix.trim())
   const cur = caption.high_level_description || ''
-  const normCur = cur.trimStart().toLowerCase()
-  const normPre = prefix.trim().toLowerCase()
-  const core = normPre.replace(/[\s.]+$/, '')
-  if (normCur.startsWith(normPre) || (core && normCur.startsWith(core + ' ') ) || (core && normCur === core)) {
-    return { applied: false, prefix, reason: 'already present' }
+  const trimmed = cur.trimStart()
+  if (core) {
+    const firstTok = trimmed.split(/\s+/, 1)[0] || ''
+    if (stripEdgePunct(firstTok) === core) {
+      // Model already prefixed (possibly with different trailing punctuation
+      // or repeated). Normalize to exactly the requested prefix, collapsing
+      // any consecutive repeats.
+      let rest = trimmed.slice(firstTok.length).trimStart()
+      for (;;) {
+        const t = rest.split(/\s+/, 1)[0] || ''
+        if (!t || stripEdgePunct(t) !== core) break
+        rest = rest.slice(t.length).trimStart()
+      }
+      const next = want + rest
+      if (next !== cur) {
+        caption.high_level_description = next
+        return { applied: true, prefix, reason: 'normalized' }
+      }
+      return { applied: false, prefix, reason: 'already present' }
+    }
   }
-  let p = prefix
-  if (!/\s$/.test(p)) p += ' '
-  caption.high_level_description = p + cur.trimStart()
+  caption.high_level_description = want + trimmed
   return { applied: true, prefix }
 }
 
@@ -290,11 +326,11 @@ async function callLlamaServer(llamaUrl, messages, temperature, topP) {
   return j.choices?.[0]?.message?.content || ''
 }
 
-async function generateCaption(llamaUrl, imageBase64, instructions) {
+async function generateCaption(llamaUrl, imageBase64, instructions, dims) {
   let lastErrors = []
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const messages = buildMessages(imageBase64, instructions, lastErrors)
+    const messages = buildMessages(imageBase64, instructions, lastErrors, dims)
 
     let text
     try {
@@ -403,9 +439,10 @@ const server = http.createServer(async (req, res) => {
       try { body = JSON.parse(buf.toString('utf8')) } catch (e) {
         return send(res, 400, { ok: false, error: 'invalid JSON body' })
       }
-      const { image_base64, instructions } = body
+      const { image_base64, instructions, image_width, image_height } = body
       if (!image_base64) return send(res, 400, { ok: false, error: 'missing image_base64' })
       console.log('[caption] steering:', JSON.stringify((instructions || '').trim().slice(0, 300)))
+      console.log('[caption] image size:', image_width, 'x', image_height)
 
       let modelPath, mmprojPath
       try {
@@ -430,7 +467,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 500, { ok: false, error: e.message })
       }
 
-      const result = await generateCaption(llamaUrl, image_base64, instructions)
+      const result = await generateCaption(llamaUrl, image_base64, instructions, { width: image_width, height: image_height })
 
       try { proc.kill() } catch (_) {}
 

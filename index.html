@@ -1137,8 +1137,19 @@ async function fileToBase64(file){
   return btoa(bin);
 }
 
-async function callCaption(base64,instructions){
-  const r=await fetch(serverUrl+'/api/caption',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:base64,instructions})});
+async function getImageSize(file){
+  try{
+    const bmp=await createImageBitmap(file);
+    const s={width:bmp.width,height:bmp.height};
+    bmp.close();
+    return s;
+  }catch(e){return {width:0,height:0}}
+}
+
+async function callCaption(base64,instructions,dims){
+  const body={image_base64:base64,instructions};
+  if(dims&&dims.width>0&&dims.height>0){body.image_width=dims.width;body.image_height=dims.height}
+  const r=await fetch(serverUrl+'/api/caption',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const j=await r.json();
   console.log('[callCaption] Server response status:', r.status, 'ok:', r.ok);
   console.log('[callCaption] Full response:', JSON.stringify(j));
@@ -1180,7 +1191,9 @@ async function captionCurrent(){
     setAiStatus('busy',`Captioning ${d.base}…`);
     const file=await d.imgHandle.getFile();
     const b64=await fileToBase64(file);
-    const data=await callCaption(b64,getSteering());
+    const dims=await getImageSize(file);
+    console.log('[captionCurrent] image size:',dims.width+'x'+dims.height);
+    const data=await callCaption(b64,getSteering(),dims);
     await writeJsonFor(d,data);
     renderEntry();
     setAiStatus('ok',`Captioned ${d.base}`);
@@ -1213,7 +1226,8 @@ async function captionAll(){
       try{
         const file=await d.imgHandle.getFile();
         const b64=await fileToBase64(file);
-        const data=await callCaption(b64,getSteering());
+        const dims=await getImageSize(file);
+        const data=await callCaption(b64,getSteering(),dims);
         await writeJsonFor(d,data);
         modified.delete(i);
         if(i===current)renderEntry();
