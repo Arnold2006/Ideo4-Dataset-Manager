@@ -28,6 +28,7 @@ A local editor for building **Ideogram 4** fine-tuning datasets, with **AI image
 | `PORT`       | `8123` (or Pinokio `{{port}}`) | Port the HTTP server listens on   |
 | `MODELS_DIR` | `app/models`                   | Where the GGUF model + mmproj live |
 
-The default model is `Llama-Joycaption-Beta-One-Hf-Llava-Q4_K.gguf` with its matching mmproj
-(downloaded from Hugging Face). Place any other GGUF vision model + matching mmproj in `app/models/`
-and the server will auto-discover it.
+The default model is `Huihui-Qwen3-VL-8B-Instruct-abliterated-Q4_K_M.gguf` with its matching
+`mmproj-F16.gguf` (from `noctrex/Huihui-Qwen3-VL-8B-Instruct-abliterated-GGUF` on Hugging Face).
+Place any other GGUF vision model + matching mmproj in `app/models/` and the server will
+auto-discover it (highest-quality quant wins; newest mmproj wins).

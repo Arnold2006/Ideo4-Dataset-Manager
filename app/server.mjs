@@ -53,18 +53,27 @@ function resolveModels() {
   const quants = files
     .filter(f => f.toLowerCase().endsWith('.gguf') && !f.toLowerCase().includes('mmproj'))
   // Prefer the highest-quality quant if several are present
-  // (Q8_0 > Q4_K > F16), otherwise fall back to sorted order.
+  // (Q8_0 > Q6_K > Q5_K_M > Q4_K_M > Q4_K > F16), otherwise fall back to sorted order.
   const rank = (f) => {
     const n = f.toLowerCase()
     if (n.includes('q8_0')) return 0
-    if (n.includes('q4_k')) return 1
-    if (n.includes('f16')) return 2
-    return 3
+    if (n.includes('q6_k')) return 1
+    if (n.includes('q5_k')) return 2
+    if (n.includes('q4_k')) return 3
+    if (n.includes('iq4')) return 4
+    if (n.includes('f16') || n.includes('bf16')) return 5
+    return 6
   }
   quants.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
   const modelFile = quants[0]
   if (!modelFile) throw new Error('No model .gguf found in app/models/')
-  const mmprojFile = files.find(f => f.toLowerCase().includes('mmproj') && f.toLowerCase().endsWith('.gguf'))
+  // Newest mmproj wins: an old model's mmproj may still sit in the folder
+  // after a model switch, and pairing the wrong mmproj silently breaks vision.
+  const mmprojFile = files
+    .filter(f => f.toLowerCase().includes('mmproj') && f.toLowerCase().endsWith('.gguf'))
+    .map(f => ({ f, t: fs.statSync(path.join(MODELS_DIR, f)).mtimeMs }))
+    .sort((a, b) => b.t - a.t)[0]?.f
+  console.log('[caption] using model:', modelFile, '| mmproj:', mmprojFile || '(none)')
   return { modelFile: path.join(MODELS_DIR, modelFile), mmprojFile: mmprojFile ? path.join(MODELS_DIR, mmprojFile) : null }
 }
 
